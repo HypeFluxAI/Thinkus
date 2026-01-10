@@ -18,6 +18,7 @@ import {
   Layout,
   AlertTriangle,
   Lightbulb,
+  Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -69,10 +70,33 @@ export default function ConfirmPage() {
   }, [searchParams])
 
   const handlePayment = async () => {
+    if (!proposal) return
+
     setIsProcessing(true)
-    // TODO: Integrate Stripe payment
-    toast.success('支付功能即将上线')
-    setIsProcessing(false)
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposal }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Checkout failed')
+      }
+
+      const data = await response.json()
+
+      if (data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url
+      } else {
+        throw new Error('No checkout URL')
+      }
+    } catch (error) {
+      console.error('Payment error:', error)
+      toast.error('支付初始化失败，请重试')
+      setIsProcessing(false)
+    }
   }
 
   if (!proposal) {
@@ -131,8 +155,17 @@ export default function ConfirmPage() {
                 </div>
                 <div className="flex flex-col gap-2 w-full md:w-auto">
                   <Button size="lg" onClick={handlePayment} disabled={isProcessing}>
-                    <CreditCard className="mr-2 h-5 w-5" />
-                    确认并支付
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        处理中...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="mr-2 h-5 w-5" />
+                        确认并支付
+                      </>
+                    )}
                   </Button>
                   <p className="text-xs text-center text-muted-foreground">
                     安全支付 · 不满意全额退款
