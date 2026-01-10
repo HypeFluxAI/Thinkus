@@ -1,0 +1,106 @@
+# ============================================================
+# 开发进度页
+# route: /projects/[id]/progress
+# ============================================================
+
+meta:
+  route: /projects/[id]/progress
+  layout: dashboard
+  auth: true
+  params: { id: projectId }
+
+# ============================================================
+# 结构
+# ============================================================
+structure:
+  type: single-column
+  maxWidth: 1200px
+
+sections:
+
+  # 进度英雄区
+  - id: progress-hero
+    type: ProgressHero
+    props:
+      percentage: ${progress.percentage}
+      currentStage: ${progress.currentStage}
+      eta: ${progress.eta}
+      stages: [需求, 设计, 开发, 测试, 部署]
+    className: bg-gradient-to-r from-primary-50 to-warm-50 rounded-2xl p-8 mb-8
+
+  # 主内容 (两列)
+  - id: main
+    type: TwoColumn
+    gap: 6
+    
+    left:
+      # 实时预览
+      - type: LivePreviewCard
+        props:
+          previewUrl: ${deployment.previewUrl}
+          currentPage: ${progress.currentPage}
+          refreshInterval: 5000
+      
+      # 开发日志
+      - type: LogStream
+        props:
+          logs: ${progress.logs}
+          maxHeight: 300px
+          autoScroll: true
+    
+    right:
+      # AI团队状态
+      - type: TeamStatus
+        props:
+          agents:
+            - { avatar: 👨‍💼, name: 产品经理, status: completed }
+            - { avatar: 🎨, name: 设计师, status: completed }
+            - { avatar: 👨‍💻, name: 开发者, status: working }
+            - { avatar: 🧪, name: 测试员, status: waiting }
+            - { avatar: 🚀, name: 运维, status: waiting }
+      
+      # 等待任务
+      - type: WaitingTasks
+        props:
+          tasks:
+            - { icon: 🌐, title: 准备域名, action: openDomainModal }
+            - { icon: 🎨, title: 上传Logo, action: openLogoModal }
+            - { icon: 📖, title: 了解SEO, href: /learn/seo }
+      
+      # 离开提示
+      - type: NoticeCard
+        props:
+          icon: 📱
+          title: 可以离开这个页面
+          message: 完成时会通知你
+
+# ============================================================
+# 状态
+# ============================================================
+state:
+  project: Project
+  progress: ProjectProgress
+
+# ============================================================
+# API
+# ============================================================
+api:
+  onMount:
+    - endpoint: projects.get
+      input: { id: projectId }
+      set: project
+    
+    - endpoint: progress.get
+      input: { projectId }
+      set: progress
+
+  subscription:
+    endpoint: progress.stream
+    input: { projectId }
+    onEvent: |
+      switch(event.type) {
+        case 'percentage_update': updatePercentage(event.data)
+        case 'stage_change': updateStage(event.data)
+        case 'log': appendLog(event.data)
+        case 'completed': router.push(`/projects/${projectId}/complete`)
+      }

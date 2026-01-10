@@ -1,0 +1,97 @@
+# ============================================================
+# 页面列表
+# ============================================================
+
+pages:
+
+  # 营销页面
+  - id: landing
+    route: /
+    auth: false
+    file: landing.yaml
+    priority: P1
+
+  # 认证
+  - id: login
+    route: /login
+    auth: false
+    file: login.yaml
+    priority: P0
+
+  - id: register
+    route: /register
+    auth: false
+    file: register.yaml
+    priority: P0
+
+  # 核心流程
+  - id: create-chat
+    route: /create
+    auth: true
+    file: create-chat.yaml
+    priority: P0
+    desc: 最重要的页面
+
+  - id: create-confirm
+    route: /create/confirm
+    auth: true
+    file: create-confirm.yaml
+    priority: P0
+
+  - id: create-payment
+    route: /create/payment
+    auth: true
+    file: create-payment.yaml
+    priority: P0
+
+  - id: progress
+    route: /projects/[id]/progress
+    auth: true
+    file: progress.yaml
+    priority: P0
+
+  - id: complete
+    route: /projects/[id]/complete
+    auth: true
+    file: complete.yaml
+    priority: P0
+
+  # 仪表盘
+  - id: dashboard
+    route: /dashboard
+    auth: true
+    file: dashboard.yaml
+    priority: P1
+
+  - id: projects
+    route: /projects
+    auth: true
+    file: projects.yaml
+    priority: P1
+
+  - id: project-detail
+    route: /projects/[id]
+    auth: true
+    file: project-detail.yaml
+    priority: P1
+
+  # 其他
+  - id: settings
+    route: /settings
+    auth: true
+    file: settings.yaml
+    priority: P2
+
+# ============================================================
+# 开发顺序
+# ============================================================
+dev_order:
+  - login
+  - register
+  - create-chat      # ⭐ 核心
+  - create-confirm
+  - create-payment
+  - progress
+  - complete
+  - dashboard
+  - projects

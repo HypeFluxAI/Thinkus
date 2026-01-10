@@ -1,0 +1,134 @@
+# ============================================================
+# 登录页
+# route: /login
+# ============================================================
+
+meta:
+  route: /login
+  layout: auth-center
+  auth: false
+  title: 登录 - Thinkus
+
+# ============================================================
+# 页面结构
+# ============================================================
+structure:
+  type: centered-card
+  maxWidth: 400px
+  background: gradient(primary-50, warm-50)
+
+# ============================================================
+# 组件
+# ============================================================
+components:
+
+  card:
+    type: Card
+    className: w-full max-w-md
+
+    header:
+      logo:
+        icon: 🌟
+        text: Thinkus
+      title: 欢迎回来 👋
+      subtitle: 继续你的创业之旅
+
+    content:
+      # OAuth按钮
+      oauth:
+        - provider: google
+          text: Google 登录
+          icon: /icons/google.svg
+          onClick: signIn('google')
+        
+        - provider: github
+          text: GitHub 登录
+          icon: /icons/github.svg
+          onClick: signIn('github')
+
+      divider:
+        text: 或使用邮箱
+
+      # 表单
+      form:
+        id: login-form
+        onSubmit: handleLogin
+        
+        fields:
+          - name: email
+            type: email
+            label: 邮箱
+            placeholder: your@email.com
+            validation:
+              required: true
+              email: true
+            autoComplete: email
+
+          - name: password
+            type: password
+            label: 密码
+            placeholder: ••••••••
+            showToggle: true
+            validation:
+              required: true
+              minLength: 6
+            autoComplete: current-password
+
+        options:
+          - type: checkbox
+            name: remember
+            label: 记住我
+
+          - type: link
+            text: 忘记密码？
+            href: /forgot-password
+
+        submit:
+          text: 登录
+          variant: default
+          fullWidth: true
+          loading: isLoading
+
+    footer:
+      text: 还没有账号？
+      link:
+        text: 免费注册
+        href: /register
+
+# ============================================================
+# 状态
+# ============================================================
+state:
+  email: string = ''
+  password: string = ''
+  remember: boolean = false
+  isLoading: boolean = false
+  error: string | null = null
+
+# ============================================================
+# 行为
+# ============================================================
+behavior:
+
+  handleLogin: |
+    1. validate form
+    2. set isLoading = true
+    3. call auth.login({ email, password })
+    4. on success: redirect to /dashboard
+    5. on error: set error message
+    6. set isLoading = false
+
+  signIn: |
+    (provider) => {
+      call auth.oauth({ provider })
+      // OAuth redirect handled by NextAuth
+    }
+
+# ============================================================
+# API调用
+# ============================================================
+api:
+  login:
+    endpoint: auth.login
+    onSuccess: router.push('/dashboard')
+    onError: setError(error.message)

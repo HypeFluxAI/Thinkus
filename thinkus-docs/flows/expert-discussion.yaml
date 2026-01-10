@@ -1,0 +1,171 @@
+# ============================================================
+# 专家讨论流程
+# ============================================================
+
+meta:
+  name: expert-discussion
+  description: 多Agent专家讨论流程
+
+# ============================================================
+# 专家定义
+# ============================================================
+experts:
+
+  # 核心专家 (始终参与)
+  core:
+    - id: mike
+      name: Mike
+      title: 产品经理
+      avatar: 👨‍💼
+      focus: 功能完整吗？流程顺畅吗？
+    
+    - id: elena
+      name: Elena
+      title: UX设计师
+      avatar: 👩‍🎨
+      focus: 用户会困惑吗？够简单吗？
+    
+    - id: david
+      name: David
+      title: 技术架构师
+      avatar: 👨‍💻
+      focus: 技术可行吗？架构合理吗？
+
+  # 扩展专家 (按条件参与)
+  extended:
+    - id: sarah
+      name: Sarah
+      title: 产品策略师
+      avatar: 👩‍💼
+      when: complexity >= L3
+    
+    - id: alex
+      name: Alex
+      title: 安全专家
+      avatar: 🔒
+      when: type in [blockchain,finance,healthcare] OR hasPayment
+    
+    - id: lisa
+      name: Lisa
+      title: 增长专家
+      avatar: 📈
+      when: complexity >= L3
+    
+    - id: kevin
+      name: Kevin
+      title: 区块链专家
+      avatar: ⛓️
+      when: type in [blockchain,nft,defi]
+
+# ============================================================
+# 讨论阶段
+# ============================================================
+phases:
+
+  - id: understanding
+    name: 需求理解
+    goal: 确保正确理解用户需求
+    maxRounds: 1
+    actions:
+      - PM总结需求
+      - 各专家提出疑问
+      - 澄清模糊点
+
+  - id: ideation
+    name: 方案构思
+    goal: 各角度提出建议
+    maxRounds: 1
+    actions:
+      - 每位专家从自己角度提议
+      - 不急于评判，先发散
+
+  - id: challenge
+    name: 挑战质疑
+    goal: 发现问题和风险
+    maxRounds: 2
+    actions:
+      - 专家互相挑战
+      - 提出问题和风险
+      - 平衡用户需求/技术可行/商业价值
+
+  - id: synthesis
+    name: 方案综合
+    goal: 形成统一方案
+    maxRounds: 1
+    actions:
+      - PM综合各方意见
+      - 解决分歧
+      - 形成最终方案
+
+  - id: validation
+    name: 最终确认
+    goal: 所有专家确认
+    maxRounds: 1
+    actions:
+      - 各专家确认自己领域OK
+      - 提出最后优化建议
+
+# ============================================================
+# 讨论模式
+# ============================================================
+modes:
+
+  quick:
+    name: 快速模式
+    phases: [understanding, synthesis]
+    duration: 30秒-1分钟
+    userInteraction: minimal
+
+  standard:
+    name: 标准模式
+    phases: [understanding, ideation, challenge, synthesis]
+    duration: 2-3分钟
+    userInteraction: key_points
+    default: true
+
+  deep:
+    name: 深度模式
+    phases: all
+    duration: 5-10分钟
+    userInteraction: full
+
+  expert:
+    name: 专家模式
+    phases: user_controlled
+    duration: unlimited
+    userInteraction: full
+
+# ============================================================
+# API事件
+# ============================================================
+events:
+  - type: round_start
+    data: { round, phase }
+  
+  - type: expert_speaking
+    data: { expertId }
+  
+  - type: expert_message
+    data: { expertId, content, timestamp }
+  
+  - type: round_summary
+    data: { summary, consensus }
+  
+  - type: waiting_for_user
+    data: { prompt }
+  
+  - type: conclusion
+    data: { conclusion }
+
+# ============================================================
+# 输出格式
+# ============================================================
+output:
+  conclusion:
+    projectName: string
+    positioning: string
+    features: Feature[]
+    techStack: string[]
+    risks: string[]
+    recommendations: string[]
+    approvals: { expertId, approved, comment }[]

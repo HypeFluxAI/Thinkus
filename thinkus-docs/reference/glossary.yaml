@@ -1,0 +1,55 @@
+# ============================================================
+# 术语表
+# ============================================================
+
+# 产品术语
+product:
+  Thinkus: AI驱动的创业成功平台
+  小T: AI助手品牌角色
+  项目: 用户创建的产品
+  方案: 专家讨论后生成的产品规格
+  复杂度: L1-L5，决定价格和时间
+
+# 流程术语
+flow:
+  创建流程: 对话→讨论→确认→支付→开发→完成
+  专家讨论: 多个AI专家讨论用户需求
+  讨论模式: quick/standard/deep/expert
+
+# 专家角色
+experts:
+  sarah: 产品策略师，关注市场和商业模式
+  mike: 产品经理，关注功能和用户流程
+  elena: UX设计师，关注用户体验
+  marcus: UI设计师，关注视觉设计
+  david: 技术架构师，关注技术可行性
+  alex: 安全专家，关注安全和合规
+  lisa: 增长专家，关注获客和留存
+  kevin: 区块链专家，Web3项目
+  frank: 金融专家，金融项目
+  helen: 医疗专家，医疗项目
+
+# 项目状态
+status:
+  draft: 草稿，未提交
+  discussing: 专家讨论中
+  pending_confirm: 待用户确认
+  pending_payment: 待支付
+  in_progress: 开发中
+  completed: 已完成
+  archived: 已归档
+
+# 开发阶段
+stages:
+  requirement: 需求分析
+  design: 设计阶段
+  development: 开发阶段
+  testing: 测试阶段
+  deployment: 部署阶段
+
+# 技术术语
+tech:
+  Agent: AI代理，执行特定任务
+  MCP: Model Context Protocol，工具协议
+  SSE: Server-Sent Events，服务端推送
+  tRPC: TypeScript RPC框架
