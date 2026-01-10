@@ -168,6 +168,17 @@ thinkus/
 - [x] 开发进度页面 (progress)
 - [x] 项目完成页面 (complete)
 
+### Phase 2 完善: 项目管理和设置
+- [x] 项目列表页面 (/projects)
+- [x] 项目详情页面 (/projects/[id])
+- [x] 设置页面布局 (/settings)
+- [x] 个人资料设置 (/settings/profile)
+- [x] API密钥管理 (/settings/credentials)
+- [x] 通知设置 (/settings/notifications)
+- [x] 外观设置 (/settings/appearance)
+- [x] 定价页面 (/pricing)
+- [x] 首页优化 (完整marketing页面)
+
 ---
 
 ## 关键决策
@@ -218,6 +229,7 @@ R2_SECRET_ACCESS_KEY=...
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-11 | 1.5.0 | 完成Phase 2完善: 项目管理、设置页面、定价页、首页优化 |
 | 2026-01-11 | 1.4.0 | 完成Phase 4: Stripe支付、开发进度页、项目完成页 |
 | 2026-01-11 | 1.3.0 | 完成Phase 3: 专家讨论系统、多阶段讨论、方案确认页面 |
 | 2026-01-11 | 1.2.0 | 完成Phase 2: 登录注册、仪表盘、对话系统、功能识别 |
