@@ -26,6 +26,8 @@ import {
   ExternalLink,
   Trash2,
   Eye,
+  Sparkles,
+  LayoutTemplate,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -141,13 +143,28 @@ export default function ProjectsPage() {
       {/* Header */}
       <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <h1 className="font-semibold text-lg">我的项目</h1>
-          <Link href="/create">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              新建项目
-            </Button>
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <span className="font-bold">Thinkus</span>
+            </Link>
+            <span className="text-muted-foreground">/</span>
+            <h1 className="font-semibold">我的项目</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/templates">
+              <Button variant="outline" size="sm">
+                <LayoutTemplate className="h-4 w-4 mr-2" />
+                模板市场
+              </Button>
+            </Link>
+            <Link href="/create">
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                新建项目
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 

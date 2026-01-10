@@ -26,6 +26,9 @@ import {
   AlertTriangle,
   Lightbulb,
   BarChart3,
+  Settings,
+  FolderOpen,
+  ChevronRight,
 } from 'lucide-react'
 
 interface ProjectDetail {
@@ -234,6 +237,62 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             )}
           </CardContent>
         </Card>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Link href={`/projects/${projectId}/analytics`}>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <BarChart3 className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <span className="font-medium">数据分析</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href={`/projects/${projectId}/assets`}>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/10">
+                    <FolderOpen className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <span className="font-medium">资产管理</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href={`/projects/${projectId}/progress`}>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-green-500/10">
+                    <Rocket className="h-5 w-5 text-green-500" />
+                  </div>
+                  <span className="font-medium">开发进度</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href={`/settings`}>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gray-500/10">
+                    <Settings className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <span className="font-medium">项目设置</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
 
         {/* Tabs */}
         <Tabs defaultValue="proposal" className="space-y-4">

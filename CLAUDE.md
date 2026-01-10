@@ -49,18 +49,29 @@ thinkus/
 │   ├── app/                    # Next.js App Router
 │   │   ├── (auth)/             # 认证相关页面
 │   │   ├── (main)/             # 主要页面
+│   │   │   ├── create/         # 创建流程 (idea/discuss/confirm/success)
+│   │   │   ├── projects/       # 项目管理
+│   │   │   │   └── [id]/       # 项目详情/进度/完成/分析/资产
+│   │   │   ├── settings/       # 设置页面
+│   │   │   └── templates/      # 模板市场
 │   │   ├── api/                # API路由
+│   │   │   ├── chat/           # 对话API
+│   │   │   ├── discuss/        # 讨论API
+│   │   │   ├── checkout/       # 支付API
+│   │   │   └── webhooks/       # Webhook处理
 │   │   └── layout.tsx
 │   ├── components/
 │   │   ├── ui/                 # shadcn/ui组件
 │   │   ├── chat/               # 对话相关
 │   │   ├── expert/             # 专家头像、消息
-│   │   └── project/            # 项目相关
+│   │   └── project/            # 项目相关 (product-type-selector)
 │   ├── lib/
 │   │   ├── trpc/               # tRPC配置
 │   │   ├── db/                 # 数据库
 │   │   ├── auth/               # 认证
 │   │   ├── ai/                 # AI相关
+│   │   ├── stripe/             # Stripe配置
+│   │   ├── config/             # 配置 (product-types)
 │   │   └── utils/
 │   ├── hooks/                  # React hooks
 │   └── types/                  # 类型定义
@@ -179,6 +190,16 @@ thinkus/
 - [x] 定价页面 (/pricing)
 - [x] 首页优化 (完整marketing页面)
 
+### Phase 3 完善: 高级功能
+- [x] 多产品类型支持 (lib/config/product-types)
+- [x] 产品类型选择器 (components/project/product-type-selector)
+- [x] 资产管理页面 (/projects/[id]/assets)
+- [x] 数据分析页面 (/projects/[id]/analytics)
+- [x] 模板市场页面 (/templates)
+- [x] 模板详情页面 (/templates/[id])
+- [x] 项目详情快速操作面板
+- [x] 导航和页脚优化
+
 ---
 
 ## 关键决策
@@ -229,6 +250,7 @@ R2_SECRET_ACCESS_KEY=...
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-11 | 1.6.0 | 完成Phase 3完善: 多产品类型、资产管理、数据分析、模板市场 |
 | 2026-01-11 | 1.5.0 | 完成Phase 2完善: 项目管理、设置页面、定价页、首页优化 |
 | 2026-01-11 | 1.4.0 | 完成Phase 4: Stripe支付、开发进度页、项目完成页 |
 | 2026-01-11 | 1.3.0 | 完成Phase 3: 专家讨论系统、多阶段讨论、方案确认页面 |

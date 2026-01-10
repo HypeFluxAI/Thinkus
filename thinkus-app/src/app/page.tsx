@@ -89,6 +89,9 @@ export default function HomePage() {
             <span className="font-bold text-xl">Thinkus</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
+            <Link href="/templates" className="text-sm text-muted-foreground hover:text-foreground">
+              模板
+            </Link>
             <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground">
               定价
             </Link>
@@ -310,8 +313,8 @@ export default function HomePage() {
               <h4 className="font-medium mb-4">产品</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/pricing" className="hover:text-foreground">定价</Link></li>
+                <li><Link href="/templates" className="hover:text-foreground">模板市场</Link></li>
                 <li><Link href="/create" className="hover:text-foreground">创建项目</Link></li>
-                <li><Link href="#" className="hover:text-foreground">案例展示</Link></li>
               </ul>
             </div>
             <div>
