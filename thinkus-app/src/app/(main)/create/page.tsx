@@ -166,8 +166,17 @@ export default function CreateProjectPage() {
       toast.error('请先描述您的需求，让AI识别功能')
       return
     }
-    // TODO: Navigate to expert discussion page
-    toast.success('即将开始专家讨论...')
+    // Collect all user messages as requirement
+    const requirement = messages
+      .filter((m) => m.role === 'user')
+      .map((m) => m.content)
+      .join('\n')
+
+    // Navigate to expert discussion page with parameters
+    const featuresParam = encodeURIComponent(JSON.stringify(features))
+    router.push(
+      `/create/discuss?requirement=${encodeURIComponent(requirement)}&features=${featuresParam}&mode=standard`
+    )
   }
 
   return (
