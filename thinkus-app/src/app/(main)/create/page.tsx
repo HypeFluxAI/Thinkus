@@ -5,13 +5,20 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ChatInterface, Message } from '@/components/chat/chat-interface'
 import { FeaturePanel, Feature } from '@/components/chat/feature-panel'
-import { ArrowLeft, Users, Sparkles } from 'lucide-react'
+import { ArrowLeft, Users, Sparkles, ChevronRight, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
+import { PhaseSelector } from '@/components/project'
+import { type ProjectPhase } from '@/lib/config/project-phases'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
+type CreateStep = 'phase' | 'describe'
 
 export default function CreateProjectPage() {
   const router = useRouter()
+  const [step, setStep] = useState<CreateStep>('phase')
+  const [selectedPhase, setSelectedPhase] = useState<ProjectPhase>('ideation')
   const [messages, setMessages] = useState<Message[]>([])
   const [features, setFeatures] = useState<Feature[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -179,20 +186,79 @@ export default function CreateProjectPage() {
     )
   }
 
+  // Phase Selection Step
+  if (step === 'phase') {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
+          <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/dashboard">
+                <Button variant="ghost" size="icon">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <span className="font-semibold">创建新项目</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="font-medium text-primary">1. 选择阶段</span>
+              <ChevronRight className="h-4 w-4" />
+              <span>2. 描述需求</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="container mx-auto px-4 py-8 max-w-4xl">
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">你的项目处于哪个阶段？</CardTitle>
+              <CardDescription>
+                选择当前阶段，我们会为你分配最合适的AI高管团队
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <PhaseSelector
+                value={selectedPhase}
+                onChange={setSelectedPhase}
+                showDetails={true}
+              />
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={() => setStep('describe')} size="lg">
+                  下一步
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
+  }
+
+  // Describe Step
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="icon" onClick={() => setStep('phase')}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
               <span className="font-semibold">创建新项目</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>1. 选择阶段</span>
+              <ChevronRight className="h-4 w-4" />
+              <span className="font-medium text-primary">2. 描述需求</span>
             </div>
           </div>
           <Button

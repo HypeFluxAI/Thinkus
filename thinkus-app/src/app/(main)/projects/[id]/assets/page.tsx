@@ -1,15 +1,11 @@
 'use client'
 
 import { useState, use } from 'react'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Input } from '@/components/ui/input'
 import {
-  ArrowLeft,
-  Code,
   Database,
   Globe,
   Key,
@@ -18,13 +14,12 @@ import {
   ExternalLink,
   Download,
   RefreshCw,
-  Settings,
   HardDrive,
-  Server,
-  Shield,
-  FileCode,
   FolderOpen,
   GitBranch,
+  Settings,
+  Shield,
+  FileCode,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -178,24 +173,27 @@ export default function AssetsPage({ params }: { params: Promise<{ id: string }>
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href={`/projects/${projectId}`}>
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <span className="font-semibold">资产管理</span>
+    <div className="bg-background">
+      {/* Page Header */}
+      <div className="border-b bg-muted/30">
+        <div className="container mx-auto px-4 py-4 max-w-4xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <FolderOpen className="h-5 w-5 text-primary" />
+                <h1 className="font-semibold text-lg">资产管理</h1>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                管理项目相关的代码、域名、数据库等资产
+              </p>
+            </div>
+            <Button variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              同步状态
+            </Button>
           </div>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            同步状态
-          </Button>
         </div>
-      </header>
+      </div>
 
       <main className="container mx-auto px-4 py-6 max-w-4xl">
         {/* Overview Stats */}

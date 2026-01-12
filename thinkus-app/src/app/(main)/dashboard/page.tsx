@@ -1,22 +1,75 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Progress } from '@/components/ui/progress'
 import { trpc } from '@/lib/trpc/client'
-import { Plus, Rocket, Clock, CheckCircle, LogOut, Sparkles } from 'lucide-react'
+import {
+  Plus, Rocket, Clock, CheckCircle, LogOut, Sparkles,
+  MessageSquare, Users, AlertTriangle, Target, TrendingUp,
+  Calendar, Settings,
+} from 'lucide-react'
 import Link from 'next/link'
+import type { IProject } from '@/lib/db/models/project'
+
+interface DashboardStats {
+  stats: {
+    projects: { total: number; active: number; completed: number }
+    discussions: { total: number; thisMonth: number; trend: number }
+    decisions: { total: number; implemented: number }
+    actionItems: {
+      total: number; pending: number; inProgress: number
+      completed: number; overdue: number; completionRate: number
+    }
+    executives: { activeCount: number; totalMessages: number }
+  }
+  subscription: {
+    plan: string
+    status: string
+    usage: { discussionsThisMonth: number; messagesThisDay: number }
+  }
+  recent: {
+    projects: Array<{ id: string; name: string; phase: string; status: string }>
+    discussions: Array<{ id: string; topic: string; status: string; projectName?: string }>
+  }
+  actionItems: {
+    overdue: Array<{ id: string; title: string; priority: string; dueDate: string }>
+    upcoming: Array<{ id: string; title: string; priority: string; dueDate: string }>
+  }
+}
 
 export default function DashboardPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const [dashboardData, setDashboardData] = useState<DashboardStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   const { data: projectsData, isLoading } = trpc.project.list.useQuery()
 
-  const projects = projectsData?.projects || []
+  // 加载仪表盘统计数据
+  useEffect(() => {
+    async function loadDashboardStats() {
+      try {
+        const res = await fetch('/api/dashboard/stats')
+        if (res.ok) {
+          const data = await res.json()
+          setDashboardData(data)
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard stats:', error)
+      } finally {
+        setStatsLoading(false)
+      }
+    }
+    loadDashboardStats()
+  }, [])
+
+  const projects = (projectsData?.projects || []) as unknown as IProject[]
   const inProgressProjects = projects.filter(p => ['discussing', 'in_progress', 'paid'].includes(p.status))
   const completedProjects = projects.filter(p => p.status === 'completed')
 
@@ -43,7 +96,12 @@ export default function DashboardPage() {
             <Sparkles className="h-6 w-6 text-primary" />
             <span className="font-bold text-xl">Thinkus</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Link href="/settings">
+              <Button variant="ghost" size="icon">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </Link>
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={session?.user?.image || ''} />
@@ -87,48 +145,139 @@ export default function DashboardPage() {
           </Card>
         </section>
 
-        {/* Stats */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {/* Stats Grid */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-lg">
-                  <Rocket className="h-6 w-6 text-primary" />
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Rocket className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{projects.length}</p>
-                  <p className="text-sm text-muted-foreground">全部项目</p>
+                  <p className="text-xl font-bold">{dashboardData?.stats.projects.total || projects.length}</p>
+                  <p className="text-xs text-muted-foreground">项目</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-                  <Clock className="h-6 w-6 text-orange-600" />
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                  <MessageSquare className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{inProgressProjects.length}</p>
-                  <p className="text-sm text-muted-foreground">进行中</p>
+                  <p className="text-xl font-bold">{dashboardData?.stats.discussions.total || 0}</p>
+                  <p className="text-xs text-muted-foreground">讨论</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                  <Target className="h-5 w-5 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{completedProjects.length}</p>
-                  <p className="text-sm text-muted-foreground">已完成</p>
+                  <p className="text-xl font-bold">{dashboardData?.stats.decisions.total || 0}</p>
+                  <p className="text-xs text-muted-foreground">决策</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+                  <Clock className="h-5 w-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold">{dashboardData?.stats.actionItems.pending || 0}</p>
+                  <p className="text-xs text-muted-foreground">待办</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold">{dashboardData?.stats.actionItems.completionRate || 0}%</p>
+                  <p className="text-xs text-muted-foreground">完成率</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/20 rounded-lg">
+                  <Users className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold">{dashboardData?.stats.executives.activeCount || 0}</p>
+                  <p className="text-xs text-muted-foreground">活跃高管</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </section>
+
+        {/* Action Items Alert */}
+        {dashboardData?.actionItems.overdue && dashboardData.actionItems.overdue.length > 0 && (
+          <section className="mb-8">
+            <Card className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  逾期行动项 ({dashboardData.actionItems.overdue.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {dashboardData.actionItems.overdue.slice(0, 3).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between text-sm">
+                      <span className="truncate">{item.title}</span>
+                      <Badge variant="destructive" className="text-xs">
+                        {new Date(item.dueDate).toLocaleDateString('zh-CN')}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {/* Upcoming Action Items */}
+        {dashboardData?.actionItems.upcoming && dashboardData.actionItems.upcoming.length > 0 && (
+          <section className="mb-8">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  即将到期
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {dashboardData.actionItems.upcoming.slice(0, 3).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between text-sm">
+                      <span className="truncate">{item.title}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {new Date(item.dueDate).toLocaleDateString('zh-CN')}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
 
         {/* Projects List */}
         <section>

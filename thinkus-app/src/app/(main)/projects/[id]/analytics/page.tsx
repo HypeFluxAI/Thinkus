@@ -1,11 +1,8 @@
 'use client'
 
 import { useState, use } from 'react'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
@@ -14,7 +11,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  ArrowLeft,
   ArrowUp,
   ArrowDown,
   Users,
@@ -133,38 +129,41 @@ export default function AnalyticsPage({ params }: { params: Promise<{ id: string
   const maxVisitors = Math.max(...DAILY_VISITORS.map(d => d.visitors))
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href={`/projects/${projectId}`}>
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
+    <div className="bg-background">
+      {/* Page Header */}
+      <div className="border-b bg-muted/30">
+        <div className="container mx-auto px-4 py-4 max-w-6xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                <h1 className="font-semibold text-lg">数据分析</h1>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                查看项目运行数据和用户行为分析
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className="w-[140px]">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24h">过去24小时</SelectItem>
+                  <SelectItem value="7d">过去7天</SelectItem>
+                  <SelectItem value="30d">过去30天</SelectItem>
+                  <SelectItem value="90d">过去90天</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                导出
               </Button>
-            </Link>
-            <span className="font-semibold">数据分析</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="w-[140px]">
-                <Calendar className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="24h">过去24小时</SelectItem>
-                <SelectItem value="7d">过去7天</SelectItem>
-                <SelectItem value="30d">过去30天</SelectItem>
-                <SelectItem value="90d">过去90天</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              导出
-            </Button>
+            </div>
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="container mx-auto px-4 py-6 max-w-6xl">
         {/* Key Metrics */}

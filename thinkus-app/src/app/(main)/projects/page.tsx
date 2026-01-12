@@ -36,106 +36,133 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { trpc } from '@/lib/trpc/client'
+import { toast } from 'sonner'
+import type { IProject, ProjectStatus } from '@/lib/db/models/project'
 
-interface Project {
-  id: string
-  name: string
-  description: string
-  status: 'draft' | 'pending_payment' | 'paid' | 'in_progress' | 'completed'
-  complexity: string
-  price: number
-  createdAt: Date
-  updatedAt: Date
-  progress?: number
-}
-
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   draft: { label: '草稿', color: 'bg-gray-500', icon: FileText },
+  discussing: { label: '讨论中', color: 'bg-blue-500', icon: Loader2 },
+  confirmed: { label: '已确认', color: 'bg-indigo-500', icon: CheckCircle2 },
   pending_payment: { label: '待支付', color: 'bg-yellow-500', icon: CreditCard },
   paid: { label: '已支付', color: 'bg-blue-500', icon: CheckCircle2 },
   in_progress: { label: '开发中', color: 'bg-primary', icon: Loader2 },
   completed: { label: '已完成', color: 'bg-green-500', icon: CheckCircle2 },
+  cancelled: { label: '已取消', color: 'bg-red-500', icon: FileText },
+  active: { label: '活跃', color: 'bg-green-500', icon: CheckCircle2 },
+  paused: { label: '已暂停', color: 'bg-yellow-500', icon: Clock },
+  archived: { label: '已归档', color: 'bg-gray-500', icon: FileText },
 }
-
-// Mock data - replace with real API call
-const MOCK_PROJECTS: Project[] = [
-  {
-    id: '1',
-    name: '宠物电商平台',
-    description: '一个综合性的宠物用品电商网站',
-    status: 'in_progress',
-    complexity: 'L3',
-    price: 499,
-    createdAt: new Date('2026-01-10'),
-    updatedAt: new Date('2026-01-11'),
-    progress: 65,
-  },
-  {
-    id: '2',
-    name: '任务管理工具',
-    description: '团队协作任务管理应用',
-    status: 'completed',
-    complexity: 'L2',
-    price: 199,
-    createdAt: new Date('2026-01-08'),
-    updatedAt: new Date('2026-01-09'),
-    progress: 100,
-  },
-  {
-    id: '3',
-    name: '个人博客',
-    description: '简洁的个人技术博客',
-    status: 'pending_payment',
-    complexity: 'L1',
-    price: 49,
-    createdAt: new Date('2026-01-11'),
-    updatedAt: new Date('2026-01-11'),
-  },
-  {
-    id: '4',
-    name: 'SaaS 数据分析平台',
-    description: '企业级数据可视化和分析平台',
-    status: 'draft',
-    complexity: 'L4',
-    price: 999,
-    createdAt: new Date('2026-01-11'),
-    updatedAt: new Date('2026-01-11'),
-  },
-]
 
 export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [projects] = useState<Project[]>(MOCK_PROJECTS)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
+
+  const utils = trpc.useUtils()
+
+  // 获取项目列表
+  const { data, isLoading } = trpc.project.list.useQuery()
+
+  // 删除项目
+  const deleteMutation = trpc.project.delete.useMutation({
+    onSuccess: () => {
+      toast.success('项目已删除')
+      utils.project.list.invalidate()
+      setDeleteDialogOpen(false)
+      setProjectToDelete(null)
+    },
+    onError: (error) => {
+      toast.error(error.message || '删除失败')
+    },
+  })
+
+  const projects = (data?.projects || []) as unknown as IProject[]
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch =
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (project.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (project.requirement?.original || '').toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
-  const getStatusBadge = (status: Project['status']) => {
-    const config = STATUS_CONFIG[status]
+  const getStatusBadge = (status: ProjectStatus) => {
+    const config = STATUS_CONFIG[status] || { label: status, color: 'bg-gray-500', icon: FileText }
+    const Icon = config.icon
     return (
       <Badge className={`${config.color} text-white`}>
-        {status === 'in_progress' && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+        {(status === 'in_progress' || status === 'discussing') && <Icon className="h-3 w-3 mr-1 animate-spin" />}
         {config.label}
       </Badge>
     )
   }
 
-  const getProjectLink = (project: Project) => {
+  const getProjectLink = (project: IProject) => {
     switch (project.status) {
       case 'in_progress':
       case 'paid':
-        return `/projects/${project.id}/progress`
+        return `/projects/${project._id}/progress`
       case 'completed':
-        return `/projects/${project.id}/complete`
+        return `/projects/${project._id}/complete`
       default:
-        return `/projects/${project.id}`
+        return `/projects/${project._id}`
     }
+  }
+
+  const handleDeleteClick = (projectId: string) => {
+    setProjectToDelete(projectId)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = () => {
+    if (projectToDelete) {
+      deleteMutation.mutate({ id: projectToDelete })
+    }
+  }
+
+  // 计算统计数据
+  const stats = {
+    total: projects.length,
+    inProgress: projects.filter(p => p.status === 'in_progress' || p.status === 'discussing').length,
+    completed: projects.filter(p => p.status === 'completed').length,
+    pendingPayment: projects.filter(p => p.status === 'pending_payment' || p.status === 'confirmed').length,
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
+          <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/" className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <span className="font-bold">Thinkus</span>
+              </Link>
+              <span className="text-muted-foreground">/</span>
+              <h1 className="font-semibold">我的项目</h1>
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -188,6 +215,7 @@ export default function ProjectsPage() {
             <SelectContent>
               <SelectItem value="all">全部状态</SelectItem>
               <SelectItem value="draft">草稿</SelectItem>
+              <SelectItem value="discussing">讨论中</SelectItem>
               <SelectItem value="pending_payment">待支付</SelectItem>
               <SelectItem value="in_progress">开发中</SelectItem>
               <SelectItem value="completed">已完成</SelectItem>
@@ -199,22 +227,22 @@ export default function ProjectsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold">{projects.length}</div>
+              <div className="text-2xl font-bold">{stats.total}</div>
               <div className="text-sm text-muted-foreground">总项目数</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-primary">
-                {projects.filter(p => p.status === 'in_progress').length}
+                {stats.inProgress}
               </div>
-              <div className="text-sm text-muted-foreground">开发中</div>
+              <div className="text-sm text-muted-foreground">进行中</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-green-500">
-                {projects.filter(p => p.status === 'completed').length}
+                {stats.completed}
               </div>
               <div className="text-sm text-muted-foreground">已完成</div>
             </CardContent>
@@ -222,9 +250,9 @@ export default function ProjectsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-yellow-500">
-                {projects.filter(p => p.status === 'pending_payment').length}
+                {stats.pendingPayment}
               </div>
-              <div className="text-sm text-muted-foreground">待支付</div>
+              <div className="text-sm text-muted-foreground">待处理</div>
             </CardContent>
           </Card>
         </div>
@@ -255,7 +283,7 @@ export default function ProjectsPage() {
         ) : (
           <div className="grid gap-4">
             {filteredProjects.map(project => (
-              <Card key={project.id} className="hover:border-primary/50 transition-colors">
+              <Card key={project._id?.toString()} className="hover:border-primary/50 transition-colors">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -268,7 +296,9 @@ export default function ProjectsPage() {
                         {getStatusBadge(project.status)}
                         <Badge variant="outline">{project.complexity}</Badge>
                       </div>
-                      <CardDescription>{project.description}</CardDescription>
+                      <CardDescription>
+                        {project.description || project.requirement?.original || '暂无描述'}
+                      </CardDescription>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -283,14 +313,19 @@ export default function ProjectsPage() {
                             查看详情
                           </Link>
                         </DropdownMenuItem>
-                        {project.status === 'completed' && (
-                          <DropdownMenuItem>
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            访问演示
+                        {project.status === 'completed' && project.deployment?.url && (
+                          <DropdownMenuItem asChild>
+                            <a href={project.deployment.url} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              访问演示
+                            </a>
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDeleteClick(project._id?.toString() || '')}
+                        >
                           <Trash2 className="h-4 w-4 mr-2" />
                           删除项目
                         </DropdownMenuItem>
@@ -304,30 +339,35 @@ export default function ProjectsPage() {
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
                         <span>
-                          {project.updatedAt.toLocaleDateString('zh-CN', {
+                          {new Date(project.updatedAt).toLocaleDateString('zh-CN', {
                             month: 'short',
                             day: 'numeric',
                           })}
                         </span>
                       </div>
-                      <span>${project.price}</span>
+                      {project.proposal?.pricing?.total && (
+                        <span>${project.proposal.pricing.total}</span>
+                      )}
+                      <span className="capitalize">{project.type}</span>
                     </div>
-                    {project.status === 'in_progress' && project.progress !== undefined && (
+                    {project.status === 'in_progress' && project.progress?.percentage !== undefined && (
                       <div className="flex items-center gap-2">
                         <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
                           <div
                             className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${project.progress}%` }}
+                            style={{ width: `${project.progress.percentage}%` }}
                           />
                         </div>
-                        <span className="text-xs text-muted-foreground">{project.progress}%</span>
+                        <span className="text-xs text-muted-foreground">{project.progress.percentage}%</span>
                       </div>
                     )}
-                    {project.status === 'pending_payment' && (
-                      <Button size="sm">
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        立即支付
-                      </Button>
+                    {(project.status === 'pending_payment' || project.status === 'confirmed') && (
+                      <Link href={`/projects/${project._id}`}>
+                        <Button size="sm">
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          立即支付
+                        </Button>
+                      </Link>
                     )}
                   </div>
                 </CardContent>
@@ -336,6 +376,30 @@ export default function ProjectsPage() {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作无法撤销。删除后，项目的所有数据将永久丢失。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

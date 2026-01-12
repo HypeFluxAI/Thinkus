@@ -8,25 +8,39 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Mail, Phone } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState({
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email')
+
+  // Email login state
+  const [emailData, setEmailData] = useState({
     email: '',
     password: '',
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Phone login state
+  const [phoneData, setPhoneData] = useState({
+    phone: '',
+    code: '',
+  })
+  const [codeSent, setCodeSent] = useState(false)
+  const [sendingCode, setSendingCode] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+
+  // Email login handler
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
       const result = await signIn('credentials', {
-        email: formData.email,
-        password: formData.password,
+        email: emailData.email,
+        password: emailData.password,
         redirect: false,
       })
 
@@ -39,6 +53,108 @@ export default function LoginPage() {
       }
     } catch {
       toast.error('登录失败，请重试')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Send phone verification code
+  const handleSendCode = async () => {
+    if (!phoneData.phone) {
+      toast.error('请输入手机号')
+      return
+    }
+
+    // Basic phone validation
+    const phoneRegex = /^1[3-9]\d{9}$/
+    if (!phoneRegex.test(phoneData.phone)) {
+      toast.error('请输入有效的手机号')
+      return
+    }
+
+    setSendingCode(true)
+    try {
+      const res = await fetch('/api/auth/phone/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneData.phone }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || '发送验证码失败')
+      }
+
+      setCodeSent(true)
+      toast.success('验证码已发送')
+
+      // Show code in dev environment
+      if (data.code) {
+        toast.info(`开发环境验证码: ${data.code}`)
+      }
+
+      // Start countdown
+      setCountdown(60)
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '发送验证码失败')
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
+  // Phone login handler
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!phoneData.code) {
+      toast.error('请输入验证码')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      // First verify the code and get a token
+      const verifyRes = await fetch('/api/auth/phone/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: phoneData.phone,
+          code: phoneData.code,
+        }),
+      })
+
+      const verifyData = await verifyRes.json()
+
+      if (!verifyRes.ok) {
+        throw new Error(verifyData.error || '验证失败')
+      }
+
+      // Then sign in with the token
+      const result = await signIn('phone-code', {
+        phone: phoneData.phone,
+        token: verifyData.token,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('登录成功')
+        router.push('/dashboard')
+        router.refresh()
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '登录失败')
     } finally {
       setIsLoading(false)
     }
@@ -62,42 +178,118 @@ export default function LoginPage() {
           <CardDescription>登录到 Thinkus，开始创建您的产品</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">邮箱</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">密码</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  登录中...
-                </>
-              ) : (
-                '登录'
-              )}
-            </Button>
-          </form>
+          <Tabs value={loginMethod} onValueChange={(v) => setLoginMethod(v as 'email' | 'phone')}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="email" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                邮箱登录
+              </TabsTrigger>
+              <TabsTrigger value="phone" className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                手机登录
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Email Login */}
+            <TabsContent value="email">
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">邮箱</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={emailData.email}
+                    onChange={(e) => setEmailData({ ...emailData, email: e.target.value })}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">密码</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={emailData.password}
+                    onChange={(e) => setEmailData({ ...emailData, password: e.target.value })}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      登录中...
+                    </>
+                  ) : (
+                    '登录'
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+
+            {/* Phone Login */}
+            <TabsContent value="phone">
+              <form onSubmit={handlePhoneSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">手机号</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="13800138000"
+                      value={phoneData.phone}
+                      onChange={(e) => setPhoneData({ ...phoneData, phone: e.target.value })}
+                      required
+                      disabled={isLoading || codeSent}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSendCode}
+                      disabled={sendingCode || countdown > 0 || isLoading}
+                    >
+                      {sendingCode ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : countdown > 0 ? (
+                        `${countdown}s`
+                      ) : (
+                        '获取验证码'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                {codeSent && (
+                  <div className="space-y-2">
+                    <Label htmlFor="code">验证码</Label>
+                    <Input
+                      id="code"
+                      type="text"
+                      placeholder="请输入6位验证码"
+                      value={phoneData.code}
+                      onChange={(e) => setPhoneData({ ...phoneData, code: e.target.value })}
+                      required
+                      disabled={isLoading}
+                      maxLength={6}
+                    />
+                  </div>
+                )}
+                <Button type="submit" className="w-full" disabled={isLoading || !codeSent}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      登录中...
+                    </>
+                  ) : (
+                    '登录'
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">

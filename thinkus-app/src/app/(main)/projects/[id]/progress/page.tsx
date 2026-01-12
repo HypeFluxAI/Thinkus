@@ -2,12 +2,12 @@
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
-  ArrowLeft,
   CheckCircle2,
   Circle,
   Loader2,
@@ -19,7 +19,6 @@ import {
   Clock,
   RefreshCw,
 } from 'lucide-react'
-import Link from 'next/link'
 
 interface DevelopmentPhase {
   id: string
@@ -183,29 +182,30 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
   const isCompleted = progressPercentage === 100
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
+    <div className="bg-background">
+      {/* Page Header */}
+      <div className="border-b bg-muted/30">
+        <div className="container mx-auto px-4 py-4 max-w-4xl">
+          <div className="flex items-center justify-between">
             <div>
-              <span className="font-semibold">开发进度</span>
-              <Badge variant="secondary" className="ml-2">
-                {isCompleted ? '已完成' : '开发中'}
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Rocket className="h-5 w-5 text-primary" />
+                <h1 className="font-semibold text-lg">开发进度</h1>
+                <Badge variant="secondary">
+                  {isCompleted ? '已完成' : '开发中'}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                实时追踪项目开发状态
+              </p>
             </div>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              刷新
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            刷新
-          </Button>
         </div>
-      </header>
+      </div>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Progress Overview */}

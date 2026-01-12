@@ -3,13 +3,16 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import GitHubProvider from 'next-auth/providers/github'
 import bcrypt from 'bcryptjs'
+import { verify } from 'jsonwebtoken'
 import dbConnect from '@/lib/db/connection'
 import User from '@/lib/db/models/user'
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    // 邮箱密码登录
     CredentialsProvider({
-      name: 'credentials',
+      id: 'email-password',
+      name: 'Email',
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
@@ -35,9 +38,53 @@ export const authOptions: NextAuthOptions = {
 
         return {
           id: user._id.toString(),
-          email: user.email,
+          email: user.email || undefined,
           name: user.name,
           image: user.avatar,
+        }
+      },
+    }),
+    // 手机号验证码登录
+    CredentialsProvider({
+      id: 'phone-code',
+      name: 'Phone',
+      credentials: {
+        phone: { label: 'Phone', type: 'tel' },
+        token: { label: 'Token', type: 'text' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.phone || !credentials?.token) {
+          throw new Error('请输入手机号')
+        }
+
+        try {
+          // 验证 token
+          const decoded = verify(
+            credentials.token,
+            process.env.NEXTAUTH_SECRET || 'fallback-secret'
+          ) as { userId: string; phone: string }
+
+          if (decoded.phone !== credentials.phone) {
+            throw new Error('验证失败')
+          }
+
+          await dbConnect()
+
+          const user = await User.findById(decoded.userId)
+
+          if (!user) {
+            throw new Error('用户不存在')
+          }
+
+          return {
+            id: user._id.toString(),
+            email: user.email || undefined,
+            name: user.name,
+            image: user.avatar,
+            phone: user.phone,
+          }
+        } catch {
+          throw new Error('验证失败，请重新获取验证码')
         }
       },
     }),
@@ -67,10 +114,13 @@ export const authOptions: NextAuthOptions = {
 
         if (!existingUser) {
           await User.create({
-            email: user.email,
-            name: user.name,
-            avatar: user.image,
-            authProvider: account.provider,
+            email: user.email || undefined,
+            name: user.name || undefined,
+            avatar: user.image || undefined,
+            providers: [{
+              provider: account.provider as 'google' | 'github',
+              providerId: account.providerAccountId,
+            }],
           })
         }
       }
@@ -79,12 +129,20 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        // 保存手机号到 token
+        if ('phone' in user && user.phone) {
+          token.phone = user.phone
+        }
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
+        // 添加手机号到 session
+        if (token.phone) {
+          (session.user as { phone?: string }).phone = token.phone as string
+        }
       }
       return session
     },

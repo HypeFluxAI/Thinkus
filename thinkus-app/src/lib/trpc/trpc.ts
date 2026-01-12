@@ -4,7 +4,14 @@ import { authOptions } from '@/lib/auth/options'
 import dbConnect from '@/lib/db/connection'
 
 interface Context {
-  session: Awaited<ReturnType<typeof getServerSession>> | null
+  session: {
+    user?: {
+      id: string
+      email?: string | null
+      name?: string | null
+      image?: string | null
+    }
+  } | null
 }
 
 export const createContext = async (): Promise<Context> => {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/options'
 import { stripe, getPriceForComplexity } from '@/lib/stripe/config'
-import { Project } from '@/lib/db/models/project'
+import Project from '@/lib/db/models/project'
 import dbConnect from '@/lib/db/connection'
 
 interface CheckoutRequest {
@@ -14,7 +14,7 @@ interface CheckoutRequest {
       id: string
       name: string
       description: string
-      priority: string
+      priority: 'P0' | 'P1' | 'P2'
     }>
     techStack: {
       frontend: string[]
@@ -57,9 +57,13 @@ export async function POST(req: NextRequest) {
             techStack: proposal.techStack,
             risks: proposal.risks,
             recommendations: proposal.recommendations,
+            pricing: {
+              base: proposal.estimatedPrice,
+              addons: [],
+              total: proposal.estimatedPrice,
+            },
           },
-          estimatedComplexity: proposal.estimatedComplexity,
-          estimatedPrice: proposal.estimatedPrice,
+          complexity: proposal.estimatedComplexity as 'L1' | 'L2' | 'L3' | 'L4' | 'L5',
           status: 'pending_payment',
         },
         { new: true }
@@ -74,11 +78,19 @@ export async function POST(req: NextRequest) {
           techStack: proposal.techStack,
           risks: proposal.risks,
           recommendations: proposal.recommendations,
+          pricing: {
+            base: proposal.estimatedPrice,
+            addons: [],
+            total: proposal.estimatedPrice,
+          },
         },
-        estimatedComplexity: proposal.estimatedComplexity,
-        estimatedPrice: proposal.estimatedPrice,
+        complexity: proposal.estimatedComplexity as 'L1' | 'L2' | 'L3' | 'L4' | 'L5',
         status: 'pending_payment',
       })
+    }
+
+    if (!project) {
+      return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
     }
 
     const price = getPriceForComplexity(proposal.estimatedComplexity)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, use } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,9 +20,13 @@ import {
   Rocket,
   Star,
   MessageSquare,
+  Loader2,
+  FileText,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { trpc } from '@/lib/trpc/client'
+import type { IProject } from '@/lib/db/models/project'
 
 interface DeliveryFile {
   name: string
@@ -41,29 +46,20 @@ const DELIVERY_FILES: DeliveryFile[] = [
 
 export default function CompletePage({ params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = use(params)
+  const router = useRouter()
   const [copiedUrl, setCopiedUrl] = useState(false)
 
-  // Mock project data
-  const project = {
-    name: '宠物电商平台',
-    demoUrl: 'https://demo.thinkus.dev/pet-shop',
-    repoUrl: 'https://github.com/thinkus-projects/pet-shop',
-    deployedAt: new Date().toLocaleDateString('zh-CN'),
-    techStack: ['Next.js 14', 'TypeScript', 'Tailwind CSS', 'MongoDB', 'Stripe'],
-    features: [
-      '用户注册登录',
-      '商品浏览搜索',
-      '购物车管理',
-      '订单支付',
-      '用户中心',
-    ],
-  }
+  // Fetch project data
+  const { data: projectData, isLoading, error } = trpc.project.getById.useQuery({ id: projectId })
+  const project = projectData?.project as unknown as IProject | undefined
 
   const handleCopyUrl = () => {
-    navigator.clipboard.writeText(project.demoUrl)
-    setCopiedUrl(true)
-    toast.success('链接已复制')
-    setTimeout(() => setCopiedUrl(false), 2000)
+    if (project?.deployment?.url) {
+      navigator.clipboard.writeText(project.deployment.url)
+      setCopiedUrl(true)
+      toast.success('链接已复制')
+      setTimeout(() => setCopiedUrl(false), 2000)
+    }
   }
 
   const handleDownload = () => {
@@ -71,13 +67,45 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
     // In real implementation, this would trigger a file download
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error || !project) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">项目不存在</h2>
+        <p className="text-muted-foreground mb-4">该项目可能已被删除或您没有访问权限</p>
+        <Button onClick={() => router.push('/projects')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          返回项目列表
+        </Button>
+      </div>
+    )
+  }
+
+  // Extract tech stack from proposal
+  const techStack = [
+    ...(project.proposal?.techStack?.frontend || []),
+    ...(project.proposal?.techStack?.backend || []),
+    ...(project.proposal?.techStack?.database || []),
+  ]
+
+  // Extract features from proposal
+  const features = project.proposal?.features?.map(f => f.name) || []
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard">
+            <Link href="/projects">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
@@ -103,16 +131,18 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
               <div className="flex-1 text-center md:text-left">
                 <h1 className="text-2xl font-bold mb-2">您的产品已准备就绪！</h1>
                 <p className="text-muted-foreground">
-                  完成时间: {project.deployedAt} · 代码100%归您所有
+                  完成时间: {new Date(project.updatedAt).toLocaleDateString('zh-CN')} · 代码100%归您所有
                 </p>
               </div>
               <div className="flex gap-2">
-                <a href={project.demoUrl} target="_blank" rel="noopener noreferrer">
-                  <Button>
-                    <Globe className="mr-2 h-4 w-4" />
-                    查看演示
-                  </Button>
-                </a>
+                {project.deployment?.url && (
+                  <a href={project.deployment.url} target="_blank" rel="noopener noreferrer">
+                    <Button>
+                      <Globe className="mr-2 h-4 w-4" />
+                      查看演示
+                    </Button>
+                  </a>
+                )}
                 <Button variant="outline" onClick={handleDownload}>
                   <Download className="mr-2 h-4 w-4" />
                   下载代码
@@ -129,45 +159,56 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
               <CardTitle className="text-base">快速访问</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-3">
-                  <Globe className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="font-medium text-sm">演示站点</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                      {project.demoUrl}
-                    </p>
+              {project.deployment?.url ? (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="font-medium text-sm">演示站点</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        {project.deployment.url}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={handleCopyUrl}>
+                      {copiedUrl ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <a href={project.deployment.url} target="_blank" rel="noopener noreferrer">
+                      <Button variant="ghost" size="icon">
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </a>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={handleCopyUrl}>
-                    {copiedUrl ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <a href={project.demoUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="ghost" size="icon">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </a>
+              ) : (
+                <div className="flex items-center p-3 rounded-lg bg-muted/50">
+                  <Globe className="h-5 w-5 text-muted-foreground mr-3" />
+                  <span className="text-sm text-muted-foreground">演示站点尚未部署</span>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-3">
                   <Github className="h-5 w-5" />
                   <div>
                     <p className="font-medium text-sm">代码仓库</p>
-                    <p className="text-xs text-muted-foreground">私有仓库已创建</p>
+                    <p className="text-xs text-muted-foreground">
+                      {project.deployment?.githubRepo ? '私有仓库已创建' : '尚未创建仓库'}
+                    </p>
                   </div>
                 </div>
-                <a href={project.repoUrl} target="_blank" rel="noopener noreferrer">
-                  <Button variant="ghost" size="icon">
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </a>
+                {project.deployment?.githubRepo && (
+                  <a href={project.deployment.githubRepo} target="_blank" rel="noopener noreferrer">
+                    <Button variant="ghost" size="icon">
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </a>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -181,13 +222,17 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {project.techStack.map(tech => (
-                  <Badge key={tech} variant="secondary">
-                    {tech}
-                  </Badge>
-                ))}
-              </div>
+              {techStack.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {techStack.map(tech => (
+                    <Badge key={tech} variant="secondary">
+                      {tech}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">技术栈信息暂未添加</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -199,14 +244,18 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
             <CardDescription>以下功能已全部实现并测试通过</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-2 gap-2">
-              {project.features.map((feature, index) => (
-                <div key={index} className="flex items-center gap-2 p-2">
-                  <Check className="h-4 w-4 text-green-500" />
-                  <span className="text-sm">{feature}</span>
-                </div>
-              ))}
-            </div>
+            {features.length > 0 ? (
+              <div className="grid md:grid-cols-2 gap-2">
+                {features.map((feature, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2">
+                    <Check className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">{feature}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">功能列表暂未添加</p>
+            )}
           </CardContent>
         </Card>
 

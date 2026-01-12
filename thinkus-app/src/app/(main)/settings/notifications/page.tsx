@@ -1,56 +1,74 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Save, Loader2 } from 'lucide-react'
+import { Save, Loader2, Mail, Bell, MessageSquare, Calendar, FileText } from 'lucide-react'
 import { toast } from 'sonner'
+import { trpc } from '@/lib/trpc/client'
 
 interface NotificationSettings {
-  email: {
-    projectUpdates: boolean
-    projectComplete: boolean
-    marketing: boolean
-    security: boolean
-  }
-  push: {
-    projectUpdates: boolean
-    projectComplete: boolean
-  }
+  email: boolean
+  push: boolean
+  sms: boolean
+  dailySummary: boolean
+  weeklyReport: boolean
 }
 
 export default function NotificationsSettingsPage() {
-  const [isLoading, setIsLoading] = useState(false)
   const [settings, setSettings] = useState<NotificationSettings>({
-    email: {
-      projectUpdates: true,
-      projectComplete: true,
-      marketing: false,
-      security: true,
+    email: true,
+    push: true,
+    sms: false,
+    dailySummary: true,
+    weeklyReport: true,
+  })
+  const [hasChanges, setHasChanges] = useState(false)
+
+  const utils = trpc.useUtils()
+
+  // 获取通知设置
+  const { data, isLoading: loadingSettings } = trpc.user.getNotificationSettings.useQuery()
+
+  // 更新通知设置
+  const updateMutation = trpc.user.updateNotificationSettings.useMutation({
+    onSuccess: () => {
+      toast.success('通知设置已更新')
+      setHasChanges(false)
+      utils.user.getNotificationSettings.invalidate()
     },
-    push: {
-      projectUpdates: true,
-      projectComplete: true,
+    onError: error => {
+      toast.error(error.message || '更新失败')
     },
   })
 
-  const handleToggle = (category: 'email' | 'push', key: string, value: boolean) => {
+  // 初始化设置
+  useEffect(() => {
+    if (data?.settings) {
+      setSettings(data.settings)
+    }
+  }, [data])
+
+  const handleToggle = (key: keyof NotificationSettings, value: boolean) => {
     setSettings(prev => ({
       ...prev,
-      [category]: {
-        ...prev[category],
-        [key]: value,
-      },
+      [key]: value,
     }))
+    setHasChanges(true)
   }
 
   const handleSave = async () => {
-    setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    toast.success('通知设置已更新')
-    setIsLoading(false)
+    await updateMutation.mutateAsync(settings)
+  }
+
+  if (loadingSettings) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -60,107 +78,99 @@ export default function NotificationsSettingsPage() {
         <p className="text-muted-foreground">管理您接收通知的方式</p>
       </div>
 
-      {/* Email Notifications */}
+      {/* 通知渠道 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">邮件通知</CardTitle>
-          <CardDescription>选择您想通过邮件接收的通知类型</CardDescription>
+          <CardTitle className="text-base">通知渠道</CardTitle>
+          <CardDescription>选择您接收通知的方式</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="email-updates">项目更新</Label>
-              <p className="text-sm text-muted-foreground">
-                项目开发进度更新通知
-              </p>
+            <div className="flex items-center gap-3">
+              <Mail className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <Label htmlFor="email-notify">邮件通知</Label>
+                <p className="text-sm text-muted-foreground">通过邮件接收重要通知</p>
+              </div>
             </div>
             <Switch
-              id="email-updates"
-              checked={settings.email.projectUpdates}
-              onCheckedChange={v => handleToggle('email', 'projectUpdates', v)}
+              id="email-notify"
+              checked={settings.email}
+              onCheckedChange={v => handleToggle('email', v)}
             />
           </div>
           <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="email-complete">项目完成</Label>
-              <p className="text-sm text-muted-foreground">
-                项目开发完成时通知
-              </p>
+            <div className="flex items-center gap-3">
+              <Bell className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <Label htmlFor="push-notify">推送通知</Label>
+                <p className="text-sm text-muted-foreground">浏览器推送实时通知</p>
+              </div>
             </div>
             <Switch
-              id="email-complete"
-              checked={settings.email.projectComplete}
-              onCheckedChange={v => handleToggle('email', 'projectComplete', v)}
+              id="push-notify"
+              checked={settings.push}
+              onCheckedChange={v => handleToggle('push', v)}
             />
           </div>
           <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="email-marketing">营销活动</Label>
-              <p className="text-sm text-muted-foreground">
-                优惠活动和新功能通知
-              </p>
+            <div className="flex items-center gap-3">
+              <MessageSquare className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <Label htmlFor="sms-notify">短信通知</Label>
+                <p className="text-sm text-muted-foreground">通过短信接收紧急通知</p>
+              </div>
             </div>
             <Switch
-              id="email-marketing"
-              checked={settings.email.marketing}
-              onCheckedChange={v => handleToggle('email', 'marketing', v)}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="email-security">安全提醒</Label>
-              <p className="text-sm text-muted-foreground">
-                账户安全相关通知
-              </p>
-            </div>
-            <Switch
-              id="email-security"
-              checked={settings.email.security}
-              onCheckedChange={v => handleToggle('email', 'security', v)}
+              id="sms-notify"
+              checked={settings.sms}
+              onCheckedChange={v => handleToggle('sms', v)}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Push Notifications */}
+      {/* 定期报告 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">推送通知</CardTitle>
-          <CardDescription>浏览器推送通知设置</CardDescription>
+          <CardTitle className="text-base">定期报告</CardTitle>
+          <CardDescription>项目进度汇总报告</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="push-updates">项目更新</Label>
-              <p className="text-sm text-muted-foreground">
-                实时推送项目进度更新
-              </p>
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <Label htmlFor="daily-summary">每日摘要</Label>
+                <p className="text-sm text-muted-foreground">每天发送项目进度摘要</p>
+              </div>
             </div>
             <Switch
-              id="push-updates"
-              checked={settings.push.projectUpdates}
-              onCheckedChange={v => handleToggle('push', 'projectUpdates', v)}
+              id="daily-summary"
+              checked={settings.dailySummary}
+              onCheckedChange={v => handleToggle('dailySummary', v)}
             />
           </div>
           <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="push-complete">项目完成</Label>
-              <p className="text-sm text-muted-foreground">
-                项目完成时即时通知
-              </p>
+            <div className="flex items-center gap-3">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <Label htmlFor="weekly-report">每周报告</Label>
+                <p className="text-sm text-muted-foreground">每周发送详细项目报告</p>
+              </div>
             </div>
             <Switch
-              id="push-complete"
-              checked={settings.push.projectComplete}
-              onCheckedChange={v => handleToggle('push', 'projectComplete', v)}
+              id="weekly-report"
+              checked={settings.weeklyReport}
+              onCheckedChange={v => handleToggle('weeklyReport', v)}
             />
           </div>
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={isLoading}>
-          {isLoading ? (
+        <Button onClick={handleSave} disabled={updateMutation.isPending || !hasChanges}>
+          {updateMutation.isPending ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               保存中...

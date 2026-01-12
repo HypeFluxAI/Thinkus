@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, use } from 'react'
+import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import { Progress } from '@/components/ui/progress'
 import {
   ArrowLeft,
   Clock,
@@ -19,7 +20,6 @@ import {
   Globe,
   Github,
   Download,
-  ExternalLink,
   FileText,
   Zap,
   CreditCard,
@@ -29,91 +29,130 @@ import {
   Settings,
   FolderOpen,
   ChevronRight,
+  Users,
+  MessageSquare,
+  Target,
+  ListTodo,
+  Loader2,
+  Circle,
+  PlayCircle,
+  XCircle,
+  PauseCircle,
 } from 'lucide-react'
+import { PhaseBadge, PhaseTimeline } from '@/components/project'
+import { type ProjectPhase, PROJECT_PHASES } from '@/lib/config/project-phases'
+import { EXECUTIVES, type AgentId } from '@/lib/config/executives'
+import { trpc } from '@/lib/trpc/client'
+import type { IProject } from '@/lib/db/models/project'
 
-interface ProjectDetail {
+// Decision and Action Item types
+interface ProjectDecision {
   id: string
-  name: string
+  title: string
   description: string
-  status: 'draft' | 'pending_payment' | 'paid' | 'in_progress' | 'completed'
-  complexity: string
-  price: number
-  createdAt: Date
-  updatedAt: Date
-  progress?: number
-  proposal?: {
-    positioning: string
-    features: Array<{
-      id: string
-      name: string
-      description: string
-      priority: string
-    }>
-    techStack: {
-      frontend: string[]
-      backend: string[]
-      database: string[]
-    }
-    risks: string[]
-    recommendations: string[]
-  }
-  demoUrl?: string
-  repoUrl?: string
+  type: string
+  importance: string
+  status: string
+  proposedBy: string
+  createdAt: string
 }
 
-const STATUS_CONFIG = {
+interface ProjectActionItem {
+  id: string
+  title: string
+  description?: string
+  category: string
+  status: string
+  priority: string
+  assignee: string
+  dueDate?: string
+  progress: number
+}
+
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: '草稿', color: 'bg-gray-500' },
+  discussing: { label: '讨论中', color: 'bg-blue-500' },
+  confirmed: { label: '已确认', color: 'bg-indigo-500' },
   pending_payment: { label: '待支付', color: 'bg-yellow-500' },
-  paid: { label: '已支付', color: 'bg-blue-500' },
-  in_progress: { label: '开发中', color: 'bg-primary' },
-  completed: { label: '已完成', color: 'bg-green-500' },
-}
-
-// Mock data
-const MOCK_PROJECT: ProjectDetail = {
-  id: '1',
-  name: '宠物电商平台',
-  description: '一个综合性的宠物用品电商网站，支持商品浏览、购物车、在线支付等功能',
-  status: 'in_progress',
-  complexity: 'L3',
-  price: 499,
-  createdAt: new Date('2026-01-10'),
-  updatedAt: new Date('2026-01-11'),
-  progress: 65,
-  proposal: {
-    positioning: '面向宠物爱好者的一站式购物平台',
-    features: [
-      { id: '1', name: '用户注册登录', description: '邮箱/手机号注册，OAuth登录', priority: 'P0' },
-      { id: '2', name: '商品浏览', description: '分类浏览、搜索、筛选', priority: 'P0' },
-      { id: '3', name: '购物车', description: '添加商品、数量管理、价格计算', priority: 'P0' },
-      { id: '4', name: '在线支付', description: 'Stripe支付集成', priority: 'P0' },
-      { id: '5', name: '订单管理', description: '订单查看、物流跟踪', priority: 'P1' },
-      { id: '6', name: '用户评价', description: '商品评价、评分系统', priority: 'P2' },
-    ],
-    techStack: {
-      frontend: ['Next.js 14', 'TypeScript', 'Tailwind CSS', 'shadcn/ui'],
-      backend: ['tRPC', 'Node.js', 'Stripe'],
-      database: ['MongoDB', 'Redis'],
-    },
-    risks: [
-      '支付集成需要商户账号审核',
-      '商品图片需要CDN加速',
-    ],
-    recommendations: [
-      '建议集成Google Analytics追踪用户行为',
-      '建议添加邮件通知功能',
-    ],
-  },
-  demoUrl: 'https://demo.thinkus.dev/pet-shop',
-  repoUrl: 'https://github.com/thinkus-projects/pet-shop',
+  paid: { label: '已支付', color: 'bg-green-500' },
+  in_progress: { label: '开发中', color: 'bg-purple-500' },
+  completed: { label: '已完成', color: 'bg-teal-500' },
+  cancelled: { label: '已取消', color: 'bg-red-500' },
+  active: { label: '进行中', color: 'bg-green-500' },
+  paused: { label: '已暂停', color: 'bg-yellow-500' },
+  archived: { label: '已归档', color: 'bg-gray-500' },
 }
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = use(params)
   const router = useRouter()
-  const [project] = useState<ProjectDetail>(MOCK_PROJECT)
+  const [decisions, setDecisions] = useState<ProjectDecision[]>([])
+  const [actionItems, setActionItems] = useState<ProjectActionItem[]>([])
+  const [loading, setLoading] = useState({ decisions: true, actionItems: true })
 
-  const statusConfig = STATUS_CONFIG[project.status]
+  // Fetch project data from tRPC
+  const { data: projectData, isLoading: projectLoading, error: projectError } = trpc.project.getById.useQuery({ id: projectId })
+
+  const project = projectData?.project as unknown as IProject | undefined
+
+  // Fetch decisions and action items
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        // Fetch decisions
+        const decisionsRes = await fetch(`/api/decisions?projectId=${projectId}`)
+        if (decisionsRes.ok) {
+          const data = await decisionsRes.json()
+          setDecisions(data.decisions || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch decisions:', error)
+      } finally {
+        setLoading(prev => ({ ...prev, decisions: false }))
+      }
+
+      try {
+        // Fetch action items
+        const actionsRes = await fetch(`/api/action-items?projectId=${projectId}`)
+        if (actionsRes.ok) {
+          const data = await actionsRes.json()
+          setActionItems(data.actionItems || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch action items:', error)
+      } finally {
+        setLoading(prev => ({ ...prev, actionItems: false }))
+      }
+    }
+
+    fetchData()
+  }, [projectId])
+
+  // Loading state
+  if (projectLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Error or not found
+  if (projectError || !project) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">项目不存在</h2>
+        <p className="text-muted-foreground mb-4">该项目可能已被删除或您没有访问权限</p>
+        <Button onClick={() => router.push('/projects')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          返回项目列表
+        </Button>
+      </div>
+    )
+  }
+
+  const statusConfig = STATUS_CONFIG[project.status] || { label: project.status, color: 'bg-gray-500' }
 
   const getActionButton = () => {
     switch (project.status) {
@@ -125,6 +164,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </Button>
         )
       case 'pending_payment':
+      case 'confirmed':
         return (
           <Button>
             <CreditCard className="h-4 w-4 mr-2" />
@@ -146,28 +186,32 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             查看交付
           </Button>
         )
+      default:
+        return null
     }
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/projects">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{project.name}</span>
-              <Badge className={`${statusConfig.color} text-white`}>{statusConfig.label}</Badge>
+    <div className="bg-background">
+      {/* Page Header */}
+      <div className="border-b bg-muted/30">
+        <div className="container mx-auto px-4 py-4 max-w-5xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Link href="/projects" className="text-sm text-muted-foreground hover:text-foreground">
+                项目列表
+              </Link>
+              <span className="text-muted-foreground">/</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">{project.name}</span>
+                <PhaseBadge phase={project.phase} size="sm" />
+                <Badge className={`${statusConfig.color} text-white`}>{statusConfig.label}</Badge>
+              </div>
             </div>
+            {getActionButton()}
           </div>
-          {getActionButton()}
         </div>
-      </header>
+      </div>
 
       <main className="container mx-auto px-4 py-6 max-w-5xl">
         {/* Overview */}
@@ -176,53 +220,58 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex flex-col md:flex-row justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold mb-2">{project.name}</h1>
-                <p className="text-muted-foreground mb-4">{project.description}</p>
+                <p className="text-muted-foreground mb-4">
+                  {project.description || project.requirement?.original || '暂无描述'}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">{project.complexity}</Badge>
-                  <Badge variant="secondary">${project.price}</Badge>
+                  {project.proposal?.pricing?.total && (
+                    <Badge variant="secondary">${project.proposal.pricing.total}</Badge>
+                  )}
+                  <Badge variant="outline" className="capitalize">{project.type}</Badge>
                 </div>
               </div>
               <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  <span>创建于 {project.createdAt.toLocaleDateString('zh-CN')}</span>
+                  <span>创建于 {new Date(project.createdAt).toLocaleDateString('zh-CN')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  <span>更新于 {project.updatedAt.toLocaleDateString('zh-CN')}</span>
+                  <span>更新于 {new Date(project.updatedAt).toLocaleDateString('zh-CN')}</span>
                 </div>
               </div>
             </div>
 
             {/* Progress bar for in_progress status */}
-            {project.status === 'in_progress' && project.progress !== undefined && (
+            {project.status === 'in_progress' && project.progress?.percentage !== undefined && (
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">开发进度</span>
-                  <span className="text-sm text-muted-foreground">{project.progress}%</span>
+                  <span className="text-sm text-muted-foreground">{project.progress.percentage}%</span>
                 </div>
                 <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary rounded-full transition-all"
-                    style={{ width: `${project.progress}%` }}
+                    style={{ width: `${project.progress.percentage}%` }}
                   />
                 </div>
               </div>
             )}
 
             {/* Quick links for completed projects */}
-            {project.status === 'completed' && (project.demoUrl || project.repoUrl) && (
+            {project.status === 'completed' && (project.deployment?.url || project.deployment?.githubRepo) && (
               <div className="mt-6 flex gap-2">
-                {project.demoUrl && (
-                  <a href={project.demoUrl} target="_blank" rel="noopener noreferrer">
+                {project.deployment?.url && (
+                  <a href={project.deployment.url} target="_blank" rel="noopener noreferrer">
                     <Button variant="outline" size="sm">
                       <Globe className="h-4 w-4 mr-2" />
                       演示站点
                     </Button>
                   </a>
                 )}
-                {project.repoUrl && (
-                  <a href={project.repoUrl} target="_blank" rel="noopener noreferrer">
+                {project.deployment?.githubRepo && (
+                  <a href={project.deployment.githubRepo} target="_blank" rel="noopener noreferrer">
                     <Button variant="outline" size="sm">
                       <Github className="h-4 w-4 mr-2" />
                       代码仓库
@@ -233,6 +282,72 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <Download className="h-4 w-4 mr-2" />
                   下载代码
                 </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Phase Timeline */}
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              项目阶段
+            </CardTitle>
+            <CardDescription>
+              当前阶段: {PROJECT_PHASES[project.phase]?.nameCn || project.phase}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PhaseTimeline
+              currentPhase={project.phase}
+              phaseHistory={project.phaseHistory}
+              orientation="horizontal"
+            />
+
+            {/* Current Phase Team */}
+            {PROJECT_PHASES[project.phase] && (
+              <div className="mt-6 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      当前阶段核心团队
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {PROJECT_PHASES[project.phase].description}
+                    </p>
+                  </div>
+                  <Link href={`/projects/${projectId}/discuss`}>
+                    <Button variant="outline" size="sm">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      发起讨论
+                    </Button>
+                  </Link>
+                </div>
+                <div className="flex gap-3 mt-3">
+                  {PROJECT_PHASES[project.phase].coreAgents.map((agentId: AgentId) => {
+                    const agent = EXECUTIVES[agentId]
+                    if (!agent) return null
+                    return (
+                      <div
+                        key={agentId}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50"
+                      >
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                          style={{ backgroundColor: agent.color }}
+                        >
+                          {agent.nameCn.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">{agent.nameCn}</div>
+                          <div className="text-xs text-muted-foreground">{agent.titleCn}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </CardContent>
@@ -279,7 +394,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </CardContent>
             </Card>
           </Link>
-          <Link href={`/settings`}>
+          <Link href={`/projects/${projectId}/settings`}>
             <Card className="hover:border-primary/50 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -296,10 +411,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Tabs */}
         <Tabs defaultValue="proposal" className="space-y-4">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="proposal">方案详情</TabsTrigger>
             <TabsTrigger value="features">功能清单</TabsTrigger>
             <TabsTrigger value="tech">技术栈</TabsTrigger>
+            <TabsTrigger value="decisions" className="flex items-center gap-1">
+              <Target className="h-3 w-3" />
+              决策 {decisions.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{decisions.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="actions" className="flex items-center gap-1">
+              <ListTodo className="h-3 w-3" />
+              行动项 {actionItems.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{actionItems.length}</Badge>}
+            </TabsTrigger>
             {project.status === 'completed' && (
               <TabsTrigger value="analytics">数据分析</TabsTrigger>
             )}
@@ -307,19 +430,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Proposal Tab */}
           <TabsContent value="proposal" className="space-y-4">
-            {project.proposal && (
+            {project.proposal ? (
               <>
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">产品定位</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">{project.proposal.positioning}</p>
+                    <p className="text-muted-foreground">{project.proposal.positioning || project.requirement?.clarified || project.requirement?.original}</p>
                   </CardContent>
                 </Card>
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  {project.proposal.risks.length > 0 && (
+                  {project.proposal.risks && project.proposal.risks.length > 0 && (
                     <Card>
                       <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
@@ -340,7 +463,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     </Card>
                   )}
 
-                  {project.proposal.recommendations.length > 0 && (
+                  {project.proposal.recommendations && project.proposal.recommendations.length > 0 && (
                     <Card>
                       <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
@@ -362,6 +485,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   )}
                 </div>
               </>
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="font-medium mb-2">暂无方案详情</h3>
+                  <p className="text-sm text-muted-foreground">完成需求讨论后会生成项目方案</p>
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
 
@@ -374,42 +505,49 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   功能清单
                 </CardTitle>
                 <CardDescription>
-                  共 {project.proposal?.features.length || 0} 个功能
+                  共 {project.proposal?.features?.length || 0} 个功能
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {['P0', 'P1', 'P2'].map(priority => {
-                    const features = project.proposal?.features.filter(f => f.priority === priority) || []
-                    if (features.length === 0) return null
+                {project.proposal?.features && project.proposal.features.length > 0 ? (
+                  <div className="space-y-4">
+                    {['P0', 'P1', 'P2'].map(priority => {
+                      const features = project.proposal?.features?.filter(f => f.priority === priority) || []
+                      if (features.length === 0) return null
 
-                    const priorityConfig = {
-                      P0: { label: 'P0 核心必备', color: 'bg-red-500' },
-                      P1: { label: 'P1 重要功能', color: 'bg-yellow-500' },
-                      P2: { label: 'P2 锦上添花', color: 'bg-green-500' },
-                    }[priority]
+                      const priorityConfig = {
+                        P0: { label: 'P0 核心必备', color: 'bg-red-500' },
+                        P1: { label: 'P1 重要功能', color: 'bg-yellow-500' },
+                        P2: { label: 'P2 锦上添花', color: 'bg-green-500' },
+                      }[priority]
 
-                    return (
-                      <div key={priority}>
-                        <Badge className={`${priorityConfig?.color} text-white mb-2`}>
-                          {priorityConfig?.label}
-                        </Badge>
-                        <ul className="space-y-2">
-                          {features.map(feature => (
-                            <li key={feature.id} className="flex items-start gap-2 py-2">
-                              <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                              <div>
-                                <span className="font-medium">{feature.name}</span>
-                                <p className="text-sm text-muted-foreground">{feature.description}</p>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                        <Separator className="my-4" />
-                      </div>
-                    )
-                  })}
-                </div>
+                      return (
+                        <div key={priority}>
+                          <Badge className={`${priorityConfig?.color} text-white mb-2`}>
+                            {priorityConfig?.label}
+                          </Badge>
+                          <ul className="space-y-2">
+                            {features.map(feature => (
+                              <li key={feature.id} className="flex items-start gap-2 py-2">
+                                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                                <div>
+                                  <span className="font-medium">{feature.name}</span>
+                                  <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                          <Separator className="my-4" />
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Rocket className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">暂无功能清单</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -424,47 +562,259 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-3 gap-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 font-medium">
-                      <Layout className="h-4 w-4" />
-                      前端
+                {project.proposal?.techStack ? (
+                  <div className="grid md:grid-cols-3 gap-6">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Layout className="h-4 w-4" />
+                        前端
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {project.proposal.techStack.frontend?.map(tech => (
+                          <Badge key={tech} variant="secondary">
+                            {tech}
+                          </Badge>
+                        )) || <span className="text-sm text-muted-foreground">待定</span>}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {project.proposal?.techStack.frontend.map(tech => (
-                        <Badge key={tech} variant="secondary">
-                          {tech}
-                        </Badge>
-                      ))}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Zap className="h-4 w-4" />
+                        后端
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {project.proposal.techStack.backend?.map(tech => (
+                          <Badge key={tech} variant="secondary">
+                            {tech}
+                          </Badge>
+                        )) || <span className="text-sm text-muted-foreground">待定</span>}
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Database className="h-4 w-4" />
+                        数据库
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {project.proposal.techStack.database?.map(tech => (
+                          <Badge key={tech} variant="secondary">
+                            {tech}
+                          </Badge>
+                        )) || <span className="text-sm text-muted-foreground">待定</span>}
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 font-medium">
-                      <Zap className="h-4 w-4" />
-                      后端
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {project.proposal?.techStack.backend.map(tech => (
-                        <Badge key={tech} variant="secondary">
-                          {tech}
-                        </Badge>
-                      ))}
-                    </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Code className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">暂无技术方案</p>
                   </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 font-medium">
-                      <Database className="h-4 w-4" />
-                      数据库
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {project.proposal?.techStack.database.map(tech => (
-                        <Badge key={tech} variant="secondary">
-                          {tech}
-                        </Badge>
-                      ))}
-                    </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Decisions Tab */}
+          <TabsContent value="decisions">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Target className="h-5 w-5 text-primary" />
+                      项目决策
+                    </CardTitle>
+                    <CardDescription>
+                      共 {decisions.length} 个决策记录
+                    </CardDescription>
                   </div>
+                  <Link href={`/projects/${projectId}/decisions`}>
+                    <Button variant="outline" size="sm">
+                      查看全部
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </Link>
                 </div>
+              </CardHeader>
+              <CardContent>
+                {loading.decisions ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : decisions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-muted-foreground mb-2">暂无决策记录</p>
+                    <p className="text-sm text-muted-foreground">
+                      在讨论中做出的决策会自动记录在这里
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {decisions.slice(0, 5).map((decision) => {
+                      const typeConfig: Record<string, { label: string; color: string }> = {
+                        feature: { label: '功能', color: 'bg-blue-500' },
+                        technical: { label: '技术', color: 'bg-purple-500' },
+                        design: { label: '设计', color: 'bg-pink-500' },
+                        business: { label: '商业', color: 'bg-green-500' },
+                        priority: { label: '优先级', color: 'bg-orange-500' },
+                        resource: { label: '资源', color: 'bg-yellow-500' },
+                        other: { label: '其他', color: 'bg-gray-500' },
+                      }
+                      const importanceConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+                        critical: { label: '关键', variant: 'destructive' },
+                        high: { label: '高', variant: 'default' },
+                        medium: { label: '中', variant: 'secondary' },
+                        low: { label: '低', variant: 'outline' },
+                      }
+                      const decisionStatusConfig: Record<string, { icon: React.ReactNode; color: string }> = {
+                        proposed: { icon: <Circle className="h-3 w-3" />, color: 'text-gray-500' },
+                        approved: { icon: <CheckCircle2 className="h-3 w-3" />, color: 'text-green-500' },
+                        rejected: { icon: <XCircle className="h-3 w-3" />, color: 'text-red-500' },
+                        implemented: { icon: <Rocket className="h-3 w-3" />, color: 'text-blue-500' },
+                        superseded: { icon: <AlertTriangle className="h-3 w-3" />, color: 'text-yellow-500' },
+                      }
+                      const type = typeConfig[decision.type] || typeConfig.other
+                      const importance = importanceConfig[decision.importance] || importanceConfig.medium
+                      const status = decisionStatusConfig[decision.status] || decisionStatusConfig.proposed
+
+                      return (
+                        <div key={decision.id} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                          <div className={`w-2 h-2 rounded-full mt-2 ${type.color}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium truncate">{decision.title}</span>
+                              <Badge variant={importance.variant} className="text-xs shrink-0">
+                                {importance.label}
+                              </Badge>
+                            </div>
+                            {decision.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                                {decision.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className={`flex items-center gap-1 ${status.color}`}>
+                                {status.icon}
+                                {decision.status === 'proposed' ? '待审批' :
+                                 decision.status === 'approved' ? '已批准' :
+                                 decision.status === 'rejected' ? '已拒绝' :
+                                 decision.status === 'implemented' ? '已实施' : '已替代'}
+                              </span>
+                              <span>类型: {type.label}</span>
+                              <span>
+                                {new Date(decision.createdAt).toLocaleDateString('zh-CN')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Actions Tab */}
+          <TabsContent value="actions">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ListTodo className="h-5 w-5 text-primary" />
+                      行动项
+                    </CardTitle>
+                    <CardDescription>
+                      共 {actionItems.length} 个待办事项
+                    </CardDescription>
+                  </div>
+                  <Link href={`/projects/${projectId}/actions`}>
+                    <Button variant="outline" size="sm">
+                      查看全部
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading.actionItems ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : actionItems.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ListTodo className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-muted-foreground mb-2">暂无行动项</p>
+                    <p className="text-sm text-muted-foreground">
+                      在讨论中产生的待办事项会自动添加到这里
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {actionItems.slice(0, 5).map((item) => {
+                      const priorityConfig: Record<string, { label: string; color: string }> = {
+                        urgent: { label: '紧急', color: 'text-red-500 bg-red-50 dark:bg-red-950' },
+                        high: { label: '高', color: 'text-orange-500 bg-orange-50 dark:bg-orange-950' },
+                        medium: { label: '中', color: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-950' },
+                        low: { label: '低', color: 'text-green-500 bg-green-50 dark:bg-green-950' },
+                      }
+                      const actionStatusConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+                        pending: { icon: <Circle className="h-4 w-4" />, label: '待处理', color: 'text-gray-500' },
+                        in_progress: { icon: <PlayCircle className="h-4 w-4" />, label: '进行中', color: 'text-blue-500' },
+                        completed: { icon: <CheckCircle2 className="h-4 w-4" />, label: '已完成', color: 'text-green-500' },
+                        blocked: { icon: <PauseCircle className="h-4 w-4" />, label: '已阻塞', color: 'text-red-500' },
+                        canceled: { icon: <XCircle className="h-4 w-4" />, label: '已取消', color: 'text-gray-400' },
+                      }
+                      const priority = priorityConfig[item.priority] || priorityConfig.medium
+                      const status = actionStatusConfig[item.status] || actionStatusConfig.pending
+                      const isOverdue = item.dueDate && new Date(item.dueDate) < new Date() && item.status !== 'completed'
+
+                      return (
+                        <div key={item.id} className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${isOverdue ? 'border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20' : 'hover:bg-muted/50'}`}>
+                          <div className={`shrink-0 ${status.color}`}>
+                            {status.icon}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`font-medium truncate ${item.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+                                {item.title}
+                              </span>
+                              <Badge className={`text-xs shrink-0 ${priority.color}`}>
+                                {priority.label}
+                              </Badge>
+                            </div>
+                            {item.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
+                                {item.description}
+                              </p>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className={status.color}>{status.label}</span>
+                                {item.assignee && (
+                                  <span>负责: {item.assignee === 'user' ? '用户' : item.assignee}</span>
+                                )}
+                                {item.dueDate && (
+                                  <span className={isOverdue ? 'text-red-500 font-medium' : ''}>
+                                    截止: {new Date(item.dueDate).toLocaleDateString('zh-CN')}
+                                  </span>
+                                )}
+                              </div>
+                              {item.progress > 0 && item.status !== 'completed' && (
+                                <div className="flex items-center gap-2">
+                                  <Progress value={item.progress} className="w-16 h-1.5" />
+                                  <span className="text-xs text-muted-foreground">{item.progress}%</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -483,19 +833,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-4 bg-muted/50 rounded-lg">
-                      <div className="text-2xl font-bold">1,234</div>
+                      <div className="text-2xl font-bold">--</div>
                       <div className="text-sm text-muted-foreground">总访问量</div>
                     </div>
                     <div className="text-center p-4 bg-muted/50 rounded-lg">
-                      <div className="text-2xl font-bold">456</div>
+                      <div className="text-2xl font-bold">--</div>
                       <div className="text-sm text-muted-foreground">独立用户</div>
                     </div>
                     <div className="text-center p-4 bg-muted/50 rounded-lg">
-                      <div className="text-2xl font-bold">2:34</div>
+                      <div className="text-2xl font-bold">--</div>
                       <div className="text-sm text-muted-foreground">平均停留</div>
                     </div>
                     <div className="text-center p-4 bg-muted/50 rounded-lg">
-                      <div className="text-2xl font-bold">3.2%</div>
+                      <div className="text-2xl font-bold">--</div>
                       <div className="text-sm text-muted-foreground">转化率</div>
                     </div>
                   </div>
