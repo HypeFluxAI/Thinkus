@@ -86,3 +86,20 @@ export {
 export {
   preferenceExtractor,
 } from './preference-extractor'
+
+// 经验库服务 (Phase 1 新增)
+export {
+  experienceService,
+  ExperienceService,
+  type ExperienceMatchRequest,
+  type ExperienceMatchResult,
+  type ExperienceCollectInput,
+} from './experience-service'
+
+// 邀请系统服务 (Phase 1 新增)
+export {
+  invitationService,
+  InvitationService,
+  type QueueStats,
+  type ContributionType,
+} from './invitation-service'

@@ -240,3 +240,14 @@ export type {
   SummaryDecision,
   SummaryArtifactRef,
 } from './session-summary'
+
+// 经验库
+export { Experience } from './experience'
+export type {
+  IExperience,
+  IExperienceModel,
+  ExperienceType,
+  ProjectCategory,
+  ComplexityLevel as ExperienceComplexityLevel,
+  CodeFile,
+} from './experience'

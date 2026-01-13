@@ -211,10 +211,11 @@ thinkus/
 - [x] Memory Injector 升级 - 集成智能增强 (smartEnhanceContext)
 - [x] 服务层统一导出 (lib/services/index.ts)
 
-#### Phase 1: 基础能力 (待开发)
-- [ ] 分层模型调度 (ModelRouter)
-- [ ] 经验库基础版 (ExperienceLibrary)
-- [ ] 邀请系统优化
+#### Phase 1: 基础能力
+- [x] 分层模型调度 (lib/ai/model-router.ts) - Haiku/Sonnet/Opus智能选择
+- [x] 经验库基础版 (lib/db/models/experience.ts, lib/services/experience-service.ts)
+- [x] 邀请系统优化 (lib/services/invitation-service.ts) - AI评分、贡献奖励、限时活动
+- [x] AI模块统一导出 (lib/ai/index.ts)
 
 #### Phase 2: 文档处理 (待开发)
 - [ ] 多格式需求输入 (PDF/图片/Excel)
@@ -285,6 +286,7 @@ R2_REGION=auto
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-13 | 1.8.0 | v12升级Phase 1: 基础能力 - ModelRouter分层调度、ExperienceLibrary经验库、InvitationService极致邀请 |
 | 2026-01-13 | 1.7.0 | v12升级Phase 0: AI员工止血 - Artifact卸载、Session Summary、Memory Controller、智能记忆增强 |
 | 2026-01-11 | 1.6.0 | 完成Phase 3完善: 多产品类型、资产管理、数据分析、模板市场 |
 | 2026-01-11 | 1.5.0 | 完成Phase 2完善: 项目管理、设置页面、定价页、首页优化 |
