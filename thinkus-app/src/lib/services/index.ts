@@ -156,3 +156,24 @@ export {
   type ErrorEvent,
   type MessageEvent,
 } from './realtime-stream'
+
+// 数据分析服务 (Phase 4 新增)
+export {
+  analyticsService,
+  AnalyticsService,
+  type Period,
+  type ProjectStats,
+  type TrendData,
+  type FunnelStep,
+  type Benchmark,
+} from './analytics-service'
+
+// 增长建议服务 (Phase 4 新增)
+export {
+  growthAdvisor,
+  GrowthAdvisorService,
+  type AdviceType,
+  type AdvicePriority,
+  type GrowthAdvice,
+  type GrowthAdviceRecord,
+} from './growth-advisor'

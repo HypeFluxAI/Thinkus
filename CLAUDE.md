@@ -228,11 +228,11 @@ thinkus/
 - [x] RealtimeStreamService (lib/services/realtime-stream.ts) - 实时事件推送、SSE支持
 - [x] 事件类型定义 (code_change/terminal_output/agent_status/progress等)
 
-#### Phase 4: 运营闭环 (待开发)
-- [ ] 统计代码嵌入
-- [ ] AnalyticsService
-- [ ] GrowthAdvisor
-- [ ] 仪表盘前端
+#### Phase 4: 运营闭环
+- [x] AnalyticsEvent Model (lib/db/models/analytics-event.ts) - 事件存储、统计查询
+- [x] AnalyticsService (lib/services/analytics-service.ts) - 数据统计、趋势分析、漏斗
+- [x] GrowthAdvisor (lib/services/growth-advisor.ts) - AI增长建议、行业基准对比
+- [x] 嵌入式统计代码生成 (generateTrackingScript)
 
 ---
 
@@ -287,6 +287,7 @@ R2_REGION=auto
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-13 | 2.1.0 | v12升级Phase 4: 运营闭环 - AnalyticsService数据分析、GrowthAdvisor增长建议 |
 | 2026-01-13 | 2.0.0 | v12升级Phase 3: 沙盒和直播 - SandboxManager容器管理、RealtimeStream实时推送 |
 | 2026-01-13 | 1.9.0 | v12升级Phase 2: 文档处理 - DocumentProcessor多格式处理、RequirementIntegrator需求整合 |
 | 2026-01-13 | 1.8.0 | v12升级Phase 1: 基础能力 - ModelRouter分层调度、ExperienceLibrary经验库、InvitationService极致邀请 |

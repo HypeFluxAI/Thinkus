@@ -251,3 +251,11 @@ export type {
   ComplexityLevel as ExperienceComplexityLevel,
   CodeFile,
 } from './experience'
+
+// 分析事件 (Phase 4 新增)
+export { AnalyticsEvent } from './analytics-event'
+export type {
+  IAnalyticsEvent,
+  IAnalyticsEventModel,
+  AnalyticsEventType,
+} from './analytics-event'
