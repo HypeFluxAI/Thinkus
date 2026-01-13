@@ -127,3 +127,32 @@ export {
   type IntegrationInput,
   type IntegrationOutput,
 } from './requirement-integrator'
+
+// 沙盒管理器 (Phase 3 新增)
+export {
+  sandboxManager,
+  SandboxManagerService,
+  type SandboxImage,
+  type SandboxStatus,
+  type SandboxConfig,
+  type Sandbox,
+  type ExecResult,
+  type FileInfo,
+  type SandboxEvent,
+} from './sandbox-manager'
+
+// 实时推送服务 (Phase 3 新增)
+export {
+  realtimeStream,
+  RealtimeStreamService,
+  createSSEStream,
+  type StreamEventType,
+  type StreamEvent,
+  type CodeChangeEvent,
+  type TerminalOutputEvent,
+  type AgentStatusEvent,
+  type ProgressEvent,
+  type PreviewUpdateEvent,
+  type ErrorEvent,
+  type MessageEvent,
+} from './realtime-stream'

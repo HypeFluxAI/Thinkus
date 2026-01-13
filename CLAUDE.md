@@ -223,10 +223,10 @@ thinkus/
 - [x] RequirementIntegrator (lib/services/requirement-integrator.ts) - 需求整合和去重
 - [x] 支持URL网页抓取
 
-#### Phase 3: 沙盒和直播 (待开发)
-- [ ] SandboxManager
-- [ ] RealtimeStreamService
-- [ ] 直播前端界面
+#### Phase 3: 沙盒和直播
+- [x] SandboxManager (lib/services/sandbox-manager.ts) - Docker容器管理、文件操作、命令执行
+- [x] RealtimeStreamService (lib/services/realtime-stream.ts) - 实时事件推送、SSE支持
+- [x] 事件类型定义 (code_change/terminal_output/agent_status/progress等)
 
 #### Phase 4: 运营闭环 (待开发)
 - [ ] 统计代码嵌入
@@ -287,6 +287,7 @@ R2_REGION=auto
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-13 | 2.0.0 | v12升级Phase 3: 沙盒和直播 - SandboxManager容器管理、RealtimeStream实时推送 |
 | 2026-01-13 | 1.9.0 | v12升级Phase 2: 文档处理 - DocumentProcessor多格式处理、RequirementIntegrator需求整合 |
 | 2026-01-13 | 1.8.0 | v12升级Phase 1: 基础能力 - ModelRouter分层调度、ExperienceLibrary经验库、InvitationService极致邀请 |
 | 2026-01-13 | 1.7.0 | v12升级Phase 0: AI员工止血 - Artifact卸载、Session Summary、Memory Controller、智能记忆增强 |
