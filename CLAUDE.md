@@ -200,6 +200,38 @@ thinkus/
 - [x] 项目详情快速操作面板
 - [x] 导航和页脚优化
 
+### v12 升级: AI员工增强
+
+#### Phase 0: 止血 (Token优化)
+- [x] Artifact Model (lib/db/models/artifact.ts) - 工具产物存储
+- [x] Session Summary Model (lib/db/models/session-summary.ts) - 会话摘要
+- [x] Artifact Service (lib/services/artifact-service.ts) - Full存储+Compact摘要
+- [x] Session Summary Service (lib/services/session-summary-service.ts) - 摘要生成
+- [x] Memory Controller (lib/services/memory-controller.ts) - 智能判断是否需要记忆
+- [x] Memory Injector 升级 - 集成智能增强 (smartEnhanceContext)
+- [x] 服务层统一导出 (lib/services/index.ts)
+
+#### Phase 1: 基础能力 (待开发)
+- [ ] 分层模型调度 (ModelRouter)
+- [ ] 经验库基础版 (ExperienceLibrary)
+- [ ] 邀请系统优化
+
+#### Phase 2: 文档处理 (待开发)
+- [ ] 多格式需求输入 (PDF/图片/Excel)
+- [ ] DocumentProcessor
+- [ ] 需求整合器
+
+#### Phase 3: 沙盒和直播 (待开发)
+- [ ] SandboxManager
+- [ ] RealtimeStreamService
+- [ ] 直播前端界面
+
+#### Phase 4: 运营闭环 (待开发)
+- [ ] 统计代码嵌入
+- [ ] AnalyticsService
+- [ ] GrowthAdvisor
+- [ ] 仪表盘前端
+
 ---
 
 ## 关键决策
@@ -242,6 +274,9 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
+R2_ENDPOINT=https://xxx.r2.cloudflarestorage.com
+R2_BUCKET_NAME=thinkus-artifacts
+R2_REGION=auto
 ```
 
 ---
@@ -250,6 +285,7 @@ R2_SECRET_ACCESS_KEY=...
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-13 | 1.7.0 | v12升级Phase 0: AI员工止血 - Artifact卸载、Session Summary、Memory Controller、智能记忆增强 |
 | 2026-01-11 | 1.6.0 | 完成Phase 3完善: 多产品类型、资产管理、数据分析、模板市场 |
 | 2026-01-11 | 1.5.0 | 完成Phase 2完善: 项目管理、设置页面、定价页、首页优化 |
 | 2026-01-11 | 1.4.0 | 完成Phase 4: Stripe支付、开发进度页、项目完成页 |

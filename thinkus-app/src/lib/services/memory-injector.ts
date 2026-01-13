@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 import { type AgentId } from '@/lib/config/executives'
-import { UserExecutive, Memory } from '@/lib/db/models'
+import { UserExecutive, Memory, SessionSummary } from '@/lib/db/models'
 import {
   retrieveMemories,
   retrieveUserPreferences,
@@ -8,6 +8,9 @@ import {
   type MemoryEntry,
 } from '@/lib/vector/memory-service'
 import type { MemoryType } from '@/lib/vector/pinecone'
+import { memoryController, type MemoryControllerOutput } from './memory-controller'
+import { sessionSummaryService } from './session-summary-service'
+import { artifactService } from './artifact-service'
 
 /**
  * 对话上下文增强结果
@@ -19,8 +22,14 @@ export interface EnhancedContext {
   relevantMemories?: string
   // 项目历史上下文
   projectHistory?: string
+  // 会话摘要上下文
+  sessionSummary?: string
+  // 相关产物上下文
+  artifacts?: string
   // 完整增强提示
   fullEnhancement: string
+  // 记忆控制器决策
+  memoryDecision?: MemoryControllerOutput
 }
 
 /**
@@ -266,4 +275,155 @@ export async function buildEnhancedSystemPrompt(params: {
   return `${basePrompt}
 
 ${enhancement.fullEnhancement}`
+}
+
+// ============ 智能记忆增强 (Phase 0 升级) ============
+
+/**
+ * 智能增强对话上下文
+ * 使用 Memory Controller 判断是否需要记忆
+ */
+export async function smartEnhanceContext(params: {
+  query: string
+  userId: mongoose.Types.ObjectId
+  agentId: AgentId
+  projectId?: mongoose.Types.ObjectId
+  sessionId?: string
+  messageCount?: number
+  recentContext?: string
+}): Promise<EnhancedContext> {
+  const {
+    query,
+    userId,
+    agentId,
+    projectId,
+    sessionId,
+    messageCount = 0,
+    recentContext,
+  } = params
+
+  const parts: string[] = []
+
+  // 1. 使用 Memory Controller 判断是否需要记忆
+  const memoryDecision = await memoryController.analyze({
+    userMessage: query,
+    projectId: projectId?.toString(),
+    agentId,
+    messageCount,
+    recentContext,
+  })
+
+  let userPreferences: string | undefined
+  let relevantMemories: string | undefined
+  let projectHistory: string | undefined
+  let sessionSummaryText: string | undefined
+  let artifactsText: string | undefined
+
+  // 2. 根据决策获取记忆
+  if (memoryDecision.needMemory !== 'no') {
+    // 获取用户偏好 (总是获取，成本低)
+    userPreferences = await getUserPreferencesContext(userId, agentId)
+    if (userPreferences) {
+      parts.push(userPreferences)
+    }
+
+    // 获取相关记忆
+    if (memoryDecision.memoryTypes.length > 0 || memoryDecision.needMemory === 'maybe') {
+      relevantMemories = await getRelevantMemoriesContext({
+        query,
+        userId: userId.toString(),
+        agentId,
+        projectId: projectId?.toString(),
+        topK: Math.floor(memoryDecision.budgetTokens / 100), // 估算条数
+      })
+      if (relevantMemories) {
+        parts.push(relevantMemories)
+      }
+    }
+
+    // 获取项目历史 (如果有项目上下文)
+    if (projectId && memoryDecision.memoryTypes.includes('project_context')) {
+      projectHistory = await getProjectHistoryContext({
+        userId,
+        projectId,
+        limit: 5,
+      })
+      if (projectHistory) {
+        parts.push(projectHistory)
+      }
+    }
+  }
+
+  // 3. 获取会话摘要 (如果是新会话或者消息数较少)
+  if (sessionId && messageCount <= 3) {
+    try {
+      const recentSummaries = await sessionSummaryService.getRecent(userId, {
+        projectId,
+        limit: 1,
+      })
+      if (recentSummaries.length > 0) {
+        sessionSummaryText = sessionSummaryService.formatMultipleForContext(recentSummaries)
+        if (sessionSummaryText) {
+          parts.push(sessionSummaryText)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get session summary:', error)
+    }
+  }
+
+  // 4. 获取相关产物的 Compact
+  if (sessionId) {
+    try {
+      const compacts = await artifactService.getSessionCompacts(sessionId)
+      if (compacts.length > 0) {
+        artifactsText = artifactService.formatCompactsForContext(compacts)
+        if (artifactsText) {
+          parts.push(artifactsText)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get artifacts:', error)
+    }
+  }
+
+  return {
+    userPreferences,
+    relevantMemories,
+    projectHistory,
+    sessionSummary: sessionSummaryText,
+    artifacts: artifactsText,
+    fullEnhancement: parts.join('\n\n'),
+    memoryDecision,
+  }
+}
+
+/**
+ * 构建智能增强的系统提示词
+ */
+export async function buildSmartEnhancedSystemPrompt(params: {
+  basePrompt: string
+  query: string
+  userId: mongoose.Types.ObjectId
+  agentId: AgentId
+  projectId?: mongoose.Types.ObjectId
+  sessionId?: string
+  messageCount?: number
+  recentContext?: string
+}): Promise<{
+  prompt: string
+  enhancement: EnhancedContext
+}> {
+  const { basePrompt, ...rest } = params
+
+  const enhancement = await smartEnhanceContext(rest)
+
+  let prompt = basePrompt
+  if (enhancement.fullEnhancement) {
+    prompt = `${basePrompt}
+
+${enhancement.fullEnhancement}`
+  }
+
+  return { prompt, enhancement }
 }

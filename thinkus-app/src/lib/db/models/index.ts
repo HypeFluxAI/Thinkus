@@ -220,3 +220,23 @@ export type {
   SharePermission,
   ShareStatus,
 } from './project-share'
+
+// Artifact 产物存储
+export { Artifact } from './artifact'
+export type {
+  IArtifact,
+  IArtifactModel,
+  ArtifactType,
+  StorageType,
+  ArtifactCompact,
+  ArtifactLocator,
+} from './artifact'
+
+// 会话摘要
+export { SessionSummary } from './session-summary'
+export type {
+  ISessionSummary,
+  ISessionSummaryModel,
+  SummaryDecision,
+  SummaryArtifactRef,
+} from './session-summary'
