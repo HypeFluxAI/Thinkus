@@ -7,5 +7,22 @@
       "maxDuration": 60
     }
   },
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/cron?job=standups",
+      "schedule": "0 9 * * 1-5"
+    },
+    {
+      "path": "/api/cron?job=distillation",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron?job=cleanup",
+      "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/cron?job=auto-execute",
+      "schedule": "0 */4 * * *"
+    }
+  ]
 }

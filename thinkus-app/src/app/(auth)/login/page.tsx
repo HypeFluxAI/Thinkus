@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { FormField, validationRules } from '@/components/ui/form-field'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
@@ -193,28 +193,43 @@ export default function LoginPage() {
             {/* Email Login */}
             <TabsContent value="email">
               <form onSubmit={handleEmailSubmit} className="space-y-4">
+                <FormField
+                  label="邮箱"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={emailData.email}
+                  onChange={(e) => setEmailData({ ...emailData, email: e.target.value })}
+                  required
+                  disabled={isLoading}
+                  rules={[
+                    validationRules.required('请输入邮箱'),
+                    validationRules.email(),
+                  ]}
+                  validateOnBlur
+                />
                 <div className="space-y-2">
-                  <Label htmlFor="email">邮箱</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={emailData.email}
-                    onChange={(e) => setEmailData({ ...emailData, email: e.target.value })}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">密码</Label>
-                  <Input
-                    id="password"
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">密码 <span className="text-destructive">*</span></span>
+                    <Link
+                      href="/forgot-password"
+                      className="text-xs text-primary hover:underline"
+                    >
+                      忘记密码？
+                    </Link>
+                  </div>
+                  <FormField
                     type="password"
                     placeholder="••••••••"
                     value={emailData.password}
                     onChange={(e) => setEmailData({ ...emailData, password: e.target.value })}
                     required
                     disabled={isLoading}
+                    rules={[
+                      validationRules.required('请输入密码'),
+                      validationRules.minLength(6, '密码至少6位'),
+                    ]}
+                    validateOnBlur
+                    showSuccessIcon={false}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
@@ -234,23 +249,29 @@ export default function LoginPage() {
             <TabsContent value="phone">
               <form onSubmit={handlePhoneSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="phone">手机号</Label>
+                  <span className="text-sm font-medium">手机号 <span className="text-destructive">*</span></span>
                   <div className="flex gap-2">
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="13800138000"
-                      value={phoneData.phone}
-                      onChange={(e) => setPhoneData({ ...phoneData, phone: e.target.value })}
-                      required
-                      disabled={isLoading || codeSent}
-                      className="flex-1"
-                    />
+                    <div className="flex-1">
+                      <FormField
+                        type="tel"
+                        placeholder="13800138000"
+                        value={phoneData.phone}
+                        onChange={(e) => setPhoneData({ ...phoneData, phone: e.target.value })}
+                        required
+                        disabled={isLoading || codeSent}
+                        rules={[
+                          validationRules.required('请输入手机号'),
+                          validationRules.phone(),
+                        ]}
+                        validateOnBlur
+                      />
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={handleSendCode}
-                      disabled={sendingCode || countdown > 0 || isLoading}
+                      disabled={sendingCode || countdown > 0 || isLoading || !phoneData.phone}
+                      className="shrink-0"
                     >
                       {sendingCode ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -263,19 +284,23 @@ export default function LoginPage() {
                   </div>
                 </div>
                 {codeSent && (
-                  <div className="space-y-2">
-                    <Label htmlFor="code">验证码</Label>
-                    <Input
-                      id="code"
-                      type="text"
-                      placeholder="请输入6位验证码"
-                      value={phoneData.code}
-                      onChange={(e) => setPhoneData({ ...phoneData, code: e.target.value })}
-                      required
-                      disabled={isLoading}
-                      maxLength={6}
-                    />
-                  </div>
+                  <FormField
+                    label="验证码"
+                    type="text"
+                    placeholder="请输入6位验证码"
+                    value={phoneData.code}
+                    onChange={(e) => setPhoneData({ ...phoneData, code: e.target.value })}
+                    required
+                    disabled={isLoading}
+                    maxLength={6}
+                    rules={[
+                      validationRules.required('请输入验证码'),
+                      validationRules.minLength(6, '验证码为6位数字'),
+                      validationRules.maxLength(6, '验证码为6位数字'),
+                    ]}
+                    validateOnChange
+                    hint="验证码已发送到您的手机"
+                  />
                 )}
                 <Button type="submit" className="w-full" disabled={isLoading || !codeSent}>
                   {isLoading ? (

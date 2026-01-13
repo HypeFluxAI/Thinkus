@@ -66,6 +66,9 @@ export interface IDiscussion extends Document {
   // 状态
   status: DiscussionStatus
 
+  // v11新增 - 讨论轮次
+  currentRound: number
+
   createdAt: Date
   concludedAt?: Date
 
@@ -190,6 +193,11 @@ const discussionSchema = new Schema<IDiscussion>(
       type: String,
       enum: ['active', 'concluded', 'cancelled'],
       default: 'active',
+    },
+    // v11新增 - 讨论轮次
+    currentRound: {
+      type: Number,
+      default: 0,
     },
     concludedAt: Date,
   },

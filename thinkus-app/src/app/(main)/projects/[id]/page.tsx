@@ -38,8 +38,12 @@ import {
   PlayCircle,
   XCircle,
   PauseCircle,
+  Calendar,
+  Share2,
 } from 'lucide-react'
-import { PhaseBadge, PhaseTimeline } from '@/components/project'
+import { PhaseBadge, PhaseTimeline, ShareDialog } from '@/components/project'
+import { StandupPanel } from '@/components/standup'
+import { EmptyState, emptyStatePresets } from '@/components/ui/empty-state'
 import { type ProjectPhase, PROJECT_PHASES } from '@/lib/config/project-phases'
 import { EXECUTIVES, type AgentId } from '@/lib/config/executives'
 import { trpc } from '@/lib/trpc/client'
@@ -89,6 +93,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [decisions, setDecisions] = useState<ProjectDecision[]>([])
   const [actionItems, setActionItems] = useState<ProjectActionItem[]>([])
   const [loading, setLoading] = useState({ decisions: true, actionItems: true })
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
 
   // Fetch project data from tRPC
   const { data: projectData, isLoading: projectLoading, error: projectError } = trpc.project.getById.useQuery({ id: projectId })
@@ -208,12 +213,30 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 <Badge className={`${statusConfig.color} text-white`}>{statusConfig.label}</Badge>
               </div>
             </div>
-            {getActionButton()}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShareDialogOpen(true)}
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                分享
+              </Button>
+              {getActionButton()}
+            </div>
           </div>
         </div>
       </div>
 
-      <main className="container mx-auto px-4 py-6 max-w-5xl">
+      {/* Share Dialog */}
+      <ShareDialog
+        projectId={projectId}
+        projectName={project.name}
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+      />
+
+      <main id="main-content" className="container mx-auto px-4 py-6 max-w-5xl">
         {/* Overview */}
         <Card className="mb-6">
           <CardContent className="p-6">
@@ -354,7 +377,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </Card>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <Link href={`/projects/${projectId}/analytics`}>
             <Card className="hover:border-primary/50 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center justify-between">
@@ -363,6 +386,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <BarChart3 className="h-5 w-5 text-blue-500" />
                   </div>
                   <span className="font-medium">数据分析</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href={`/projects/${projectId}/standups`}>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-orange-500/10">
+                    <Calendar className="h-5 w-5 text-orange-500" />
+                  </div>
+                  <span className="font-medium">团队例会</span>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </CardContent>
@@ -422,6 +458,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <TabsTrigger value="actions" className="flex items-center gap-1">
               <ListTodo className="h-3 w-3" />
               行动项 {actionItems.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{actionItems.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="standups" className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              团队例会
             </TabsTrigger>
             {project.status === 'completed' && (
               <TabsTrigger value="analytics">数据分析</TabsTrigger>
@@ -543,10 +583,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Rocket className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground">暂无功能清单</p>
-                  </div>
+                  <EmptyState
+                    {...emptyStatePresets.features}
+                    variant="minimal"
+                    action={{
+                      label: '发起讨论',
+                      href: `/projects/${projectId}/discuss`,
+                    }}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -605,10 +649,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Code className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground">暂无技术方案</p>
-                  </div>
+                  <EmptyState
+                    icon={Code}
+                    title="暂无技术方案"
+                    description="完成需求讨论后会生成技术方案"
+                    variant="minimal"
+                    action={{
+                      label: '发起讨论',
+                      href: `/projects/${projectId}/discuss`,
+                    }}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -642,13 +692,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : decisions.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <p className="text-muted-foreground mb-2">暂无决策记录</p>
-                    <p className="text-sm text-muted-foreground">
-                      在讨论中做出的决策会自动记录在这里
-                    </p>
-                  </div>
+                  <EmptyState
+                    {...emptyStatePresets.decisions}
+                    variant="minimal"
+                    action={{
+                      label: '发起讨论',
+                      href: `/projects/${projectId}/discuss`,
+                    }}
+                  />
                 ) : (
                   <div className="space-y-3">
                     {decisions.slice(0, 5).map((decision) => {
@@ -744,13 +795,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : actionItems.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ListTodo className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <p className="text-muted-foreground mb-2">暂无行动项</p>
-                    <p className="text-sm text-muted-foreground">
-                      在讨论中产生的待办事项会自动添加到这里
-                    </p>
-                  </div>
+                  <EmptyState
+                    {...emptyStatePresets.actionItems}
+                    variant="minimal"
+                    action={{
+                      label: '发起讨论',
+                      href: `/projects/${projectId}/discuss`,
+                    }}
+                  />
                 ) : (
                   <div className="space-y-3">
                     {actionItems.slice(0, 5).map((item) => {
@@ -817,6 +869,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Standups Tab */}
+          <TabsContent value="standups">
+            <StandupPanel projectId={projectId} />
           </TabsContent>
 
           {/* Analytics Tab (for completed projects) */}

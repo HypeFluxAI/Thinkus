@@ -6,3 +6,27 @@ export { ExecutiveSelector, ExecutiveSelectorCompact } from './executive-selecto
 
 // 多高管讨论
 export { MultiAgentDiscussion } from './multi-agent-discussion'
+
+// 高管卡片和团队展示
+export {
+  ExecutiveCard,
+  ExecutiveTeamGrid,
+  ExecutiveAvatarStack,
+  SpeakingIndicator,
+} from './executive-card'
+
+// 决策确认对话框
+export { DecisionConfirmDialog } from './decision-confirm'
+
+// 高管讨论面板 (AI自治系统集成)
+export {
+  ExecutiveDiscussionPanel,
+  DiscussionSummaryPanel,
+} from './executive-discussion-panel'
+
+// 定时任务 (每日站会/周复盘)
+export {
+  ScheduledTasks,
+  TaskExecutionResult,
+  type ScheduledTask,
+} from './scheduled-tasks'

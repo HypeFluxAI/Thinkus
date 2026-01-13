@@ -22,6 +22,9 @@ export type DecisionStatus =
 // 决策重要性
 export type DecisionImportance = 'critical' | 'high' | 'medium' | 'low'
 
+// 决策级别 (v11新增 - 用于自动执行引擎)
+export type DecisionLevel = 'L0_AUTONOMOUS' | 'L1_NOTIFY' | 'L2_CONFIRM' | 'L3_CRITICAL'
+
 // 决策接口
 export interface IDecision extends Document {
   _id: Types.ObjectId
@@ -35,6 +38,15 @@ export interface IDecision extends Document {
   type: DecisionType
   status: DecisionStatus
   importance: DecisionImportance
+
+  // v11新增字段
+  level: DecisionLevel
+  proposedAction?: string
+  riskFactors?: string[]
+  expiresAt?: Date
+  approvalNotes?: string
+  rejectedAt?: Date
+  rejectionReason?: string
 
   // 决策参与者
   proposedBy: AgentId | 'user'
@@ -135,6 +147,19 @@ const DecisionSchema = new Schema<IDecision>(
       enum: ['critical', 'high', 'medium', 'low'],
       default: 'medium',
     },
+
+    // v11新增字段
+    level: {
+      type: String,
+      enum: ['L0_AUTONOMOUS', 'L1_NOTIFY', 'L2_CONFIRM', 'L3_CRITICAL'],
+      default: 'L2_CONFIRM',
+    },
+    proposedAction: String,
+    riskFactors: [String],
+    expiresAt: Date,
+    approvalNotes: String,
+    rejectedAt: Date,
+    rejectionReason: String,
 
     // 决策参与者
     proposedBy: {

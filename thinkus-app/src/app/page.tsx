@@ -92,14 +92,14 @@ export default function HomePage() {
             <Link href="/templates" className="text-sm text-muted-foreground hover:text-foreground">
               模板
             </Link>
+            <Link href="/cases" className="text-sm text-muted-foreground hover:text-foreground">
+              案例
+            </Link>
             <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground">
               定价
             </Link>
             <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground">
               功能
-            </Link>
-            <Link href="#process" className="text-sm text-muted-foreground hover:text-foreground">
-              流程
             </Link>
           </nav>
           <div className="flex items-center gap-4">
@@ -113,42 +113,48 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         {/* Hero Section */}
-        <section className="py-20 md:py-32 bg-gradient-to-b from-primary/5 to-background">
-          <div className="container mx-auto px-4">
+        <section className="py-20 md:py-32 bg-gradient-to-b from-primary/5 to-background relative overflow-hidden">
+          {/* Background decoration */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl animate-float" />
+            <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl animate-float animation-delay-500" />
+          </div>
+
+          <div className="container mx-auto px-4 relative">
             <div className="text-center max-w-3xl mx-auto">
-              <Badge variant="secondary" className="mb-6">
-                <Sparkles className="h-3 w-3 mr-1" />
+              <Badge variant="secondary" className="mb-6 animate-fade-in-down">
+                <Sparkles className="h-3 w-3 mr-1 animate-pulse" />
                 AI驱动的创业成功平台
               </Badge>
 
-              <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+              <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight animate-fade-in-up animation-delay-100">
                 把你的想法
                 <br />
-                <span className="text-primary">变成产品</span>
+                <span className="text-primary bg-gradient-to-r from-primary to-primary/70 bg-clip-text">变成产品</span>
               </h1>
 
-              <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+              <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in-up animation-delay-200">
                 告诉AI你的创业想法，专家团队将为你规划方案、生成代码、部署上线。
                 <br className="hidden md:block" />
                 从想法到产品，最快只需要一天。
               </p>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up animation-delay-300">
                 <Link href="/create">
-                  <Button size="lg" className="text-lg px-8">
+                  <Button size="lg" className="text-lg px-8 shadow-lg hover:shadow-xl transition-shadow">
                     免费开始
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <Button size="lg" variant="outline" className="text-lg px-8">
+                <Button size="lg" variant="outline" className="text-lg px-8 hover:bg-primary/5 transition-colors">
                   <Play className="mr-2 h-5 w-5" />
                   观看演示
                 </Button>
               </div>
 
-              <p className="text-sm text-muted-foreground mt-4">
+              <p className="text-sm text-muted-foreground mt-4 animate-fade-in-up animation-delay-400">
                 无需信用卡 · 免费体验对话 · 满意后再付款
               </p>
             </div>

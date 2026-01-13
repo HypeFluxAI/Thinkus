@@ -4,11 +4,13 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { ArrowLeft, User, Key, Bell, Palette, CreditCard } from 'lucide-react'
+import { ArrowLeft, User, Key, Bell, Palette, CreditCard, Zap, BarChart3 } from 'lucide-react'
 
 const SETTINGS_NAV = [
   { href: '/settings/profile', label: '个人资料', icon: User },
   { href: '/settings/subscription', label: '订阅管理', icon: CreditCard },
+  { href: '/settings/usage', label: 'AI 使用分析', icon: BarChart3 },
+  { href: '/settings/automation', label: '自动化', icon: Zap },
   { href: '/settings/credentials', label: 'API 密钥', icon: Key },
   { href: '/settings/notifications', label: '通知设置', icon: Bell },
   { href: '/settings/appearance', label: '外观设置', icon: Palette },

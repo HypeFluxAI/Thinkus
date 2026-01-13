@@ -144,3 +144,79 @@ export type { IVerificationCode, VerificationCodeType } from './verification-cod
 // 用户凭证
 export { UserCredential } from './user-credential'
 export type { IUserCredential, CredentialServiceType } from './user-credential'
+
+// 交付物
+export { Deliverable } from './deliverable'
+export type {
+  IDeliverable,
+  IDeliverableModel,
+  DeliverableType,
+  DeliverableStatus,
+  DeliverableVersion,
+} from './deliverable'
+
+// 外部专家咨询
+export { ExpertConsultation } from './expert-consultation'
+export type {
+  IExpertConsultation,
+  IExpertConsultationModel,
+  ConsultationStatus,
+  ConsultationMessage,
+} from './expert-consultation'
+
+// 蒸馏技能
+export { DistilledSkill } from './distilled-skill'
+export type {
+  IDistilledSkill,
+  IDistilledSkillModel,
+  SkillCategory,
+} from './distilled-skill'
+
+// 例会
+export { Standup } from './standup'
+export type {
+  IStandup,
+  IStandupModel,
+  StandupType,
+  StandupStatus,
+  AgendaItem,
+  ParticipantReport,
+} from './standup'
+
+// AI 使用统计
+export { AIUsage, MODEL_PRICING } from './ai-usage'
+export type {
+  IAIUsage,
+  IAIUsageModel,
+  AIModel,
+  UsageType,
+  UsageStats,
+} from './ai-usage'
+
+// 用户反馈
+export { Feedback } from './feedback'
+export type {
+  IFeedback,
+  IFeedbackModel,
+  FeedbackType,
+  FeedbackStatus,
+  FeedbackPriority,
+} from './feedback'
+
+// 活动日志
+export { ActivityLog } from './activity-log'
+export type {
+  IActivityLog,
+  IActivityLogModel,
+  ActivityType,
+  ActivityEntity,
+} from './activity-log'
+
+// 项目分享
+export { ProjectShare } from './project-share'
+export type {
+  IProjectShare,
+  IProjectShareModel,
+  SharePermission,
+  ShareStatus,
+} from './project-share'

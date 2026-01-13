@@ -305,4 +305,5 @@ ProjectSchema.methods.incrementDeliverableCount = async function (): Promise<voi
 
 const Project: Model<IProject> = mongoose.models.Project || mongoose.model<IProject>('Project', ProjectSchema)
 
+export { Project }
 export default Project

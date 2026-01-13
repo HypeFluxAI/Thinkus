@@ -4,6 +4,7 @@ import "./globals.css";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import { AuthProvider } from "@/lib/auth/provider";
 import { Toaster } from "@/components/ui/sonner";
+import { SkipLink } from "@/components/ui/skip-link";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,6 +31,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <SkipLink />
         <AuthProvider>
           <TRPCProvider>
             {children}

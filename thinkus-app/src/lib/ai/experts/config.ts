@@ -70,6 +70,7 @@ export const EXTENDED_EXPERTS: Expert[] = [
 
 export type DiscussionPhase =
   | 'understanding'
+  | 'brainstorming'
   | 'ideation'
   | 'challenge'
   | 'synthesis'
@@ -79,7 +80,9 @@ export interface DiscussionPhaseConfig {
   id: DiscussionPhase
   name: string
   goal: string
+  minRounds: number
   maxRounds: number
+  allowUserInput: boolean
 }
 
 export const DISCUSSION_PHASES: DiscussionPhaseConfig[] = [
@@ -87,60 +90,97 @@ export const DISCUSSION_PHASES: DiscussionPhaseConfig[] = [
     id: 'understanding',
     name: '需求理解',
     goal: '确保正确理解用户需求',
-    maxRounds: 1,
+    minRounds: 1,
+    maxRounds: 3,
+    allowUserInput: true,
+  },
+  {
+    id: 'brainstorming',
+    name: '头脑风暴',
+    goal: '深度探索各种可能性，发散思维',
+    minRounds: 10,
+    maxRounds: 30,
+    allowUserInput: true,
   },
   {
     id: 'ideation',
     name: '方案构思',
     goal: '各角度提出建议',
-    maxRounds: 1,
+    minRounds: 1,
+    maxRounds: 5,
+    allowUserInput: true,
   },
   {
     id: 'challenge',
     name: '挑战质疑',
     goal: '发现问题和风险',
-    maxRounds: 2,
+    minRounds: 2,
+    maxRounds: 10,
+    allowUserInput: true,
   },
   {
     id: 'synthesis',
     name: '方案综合',
     goal: '形成统一方案',
-    maxRounds: 1,
+    minRounds: 1,
+    maxRounds: 3,
+    allowUserInput: false,
   },
   {
     id: 'validation',
     name: '最终确认',
     goal: '所有专家确认',
-    maxRounds: 1,
+    minRounds: 1,
+    maxRounds: 2,
+    allowUserInput: true,
   },
 ]
 
-export type DiscussionMode = 'quick' | 'standard' | 'deep' | 'expert'
+export type DiscussionMode = 'quick' | 'standard' | 'deep' | 'brainstorm' | 'expert'
 
-export const DISCUSSION_MODES: Record<DiscussionMode, {
+export interface DiscussionModeConfig {
   name: string
   phases: DiscussionPhase[]
   description: string
-}> = {
+  estimatedMinutes: string
+  targetRounds: number
+}
+
+export const DISCUSSION_MODES: Record<DiscussionMode, DiscussionModeConfig> = {
   quick: {
     name: '快速模式',
     phases: ['understanding', 'synthesis'],
     description: '30秒-1分钟，直接看结论',
+    estimatedMinutes: '1',
+    targetRounds: 3,
   },
   standard: {
     name: '标准模式',
     phases: ['understanding', 'ideation', 'challenge', 'synthesis'],
     description: '2-3分钟，观看关键讨论',
+    estimatedMinutes: '3',
+    targetRounds: 8,
   },
   deep: {
     name: '深度模式',
     phases: ['understanding', 'ideation', 'challenge', 'synthesis', 'validation'],
     description: '5-10分钟，完整参与',
+    estimatedMinutes: '10',
+    targetRounds: 15,
+  },
+  brainstorm: {
+    name: '头脑风暴',
+    phases: ['understanding', 'brainstorming', 'challenge', 'synthesis'],
+    description: '10-30轮深度讨论，充分探索需求',
+    estimatedMinutes: '15-30',
+    targetRounds: 25,
   },
   expert: {
     name: '专家模式',
-    phases: ['understanding', 'ideation', 'challenge', 'synthesis', 'validation'],
-    description: '用户主导讨论',
+    phases: ['understanding', 'brainstorming', 'ideation', 'challenge', 'synthesis', 'validation'],
+    description: '用户主导讨论，随时可以介入',
+    estimatedMinutes: '自定义',
+    targetRounds: 30,
   },
 }
 
@@ -165,4 +205,8 @@ export function selectExperts(projectType: string, complexity: string): Expert[]
   }
 
   return experts
+}
+
+export function getPhaseConfig(phase: DiscussionPhase): DiscussionPhaseConfig {
+  return DISCUSSION_PHASES.find(p => p.id === phase) || DISCUSSION_PHASES[0]
 }

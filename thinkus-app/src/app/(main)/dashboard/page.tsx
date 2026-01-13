@@ -12,8 +12,14 @@ import { trpc } from '@/lib/trpc/client'
 import {
   Plus, Rocket, Clock, CheckCircle, LogOut, Sparkles,
   MessageSquare, Users, AlertTriangle, Target, TrendingUp,
-  Calendar, Settings,
+  Calendar, Settings, HelpCircle,
 } from 'lucide-react'
+import { EmptyState, emptyStatePresets } from '@/components/ui/empty-state'
+import { NotificationDropdown } from '@/components/notification'
+import { OnboardingGuide, OnboardingChecklist } from '@/components/onboarding'
+import { FeedbackDialog } from '@/components/feedback'
+import { KeyboardShortcuts } from '@/components/keyboard-shortcuts'
+import { CommandPalette, SearchTrigger } from '@/components/search'
 import Link from 'next/link'
 import type { IProject } from '@/lib/db/models/project'
 
@@ -89,6 +95,15 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted">
+      {/* Onboarding Guide */}
+      <OnboardingGuide />
+
+      {/* Keyboard Shortcuts */}
+      <KeyboardShortcuts />
+
+      {/* Command Palette */}
+      <CommandPalette />
+
       {/* Header */}
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -97,6 +112,26 @@ export default function DashboardPage() {
             <span className="font-bold text-xl">Thinkus</span>
           </div>
           <div className="flex items-center gap-2">
+            <SearchTrigger />
+            <Link href="/experts">
+              <Button variant="ghost" size="icon" title="专家咨询">
+                <Users className="h-4 w-4" />
+              </Button>
+            </Link>
+            <NotificationDropdown />
+            <FeedbackDialog
+              trigger={
+                <Button variant="ghost" size="icon" title="反馈">
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              }
+              page="/dashboard"
+            />
+            <Link href="/help">
+              <Button variant="ghost" size="icon" title="帮助">
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            </Link>
             <Link href="/settings">
               <Button variant="ghost" size="icon">
                 <Settings className="h-4 w-4" />
@@ -116,7 +151,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main id="main-content" className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <section className="mb-8">
           <h1 className="text-3xl font-bold mb-2">
@@ -143,6 +178,71 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+        </section>
+
+        {/* Secondary Quick Actions */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Link href="/ceo">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                      <Target className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">CEO 工作台</h3>
+                      <p className="text-sm text-muted-foreground">待确认决策和全局视图</p>
+                    </div>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/experts">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer border-purple-200 dark:border-purple-900 bg-purple-50/50 dark:bg-purple-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                      <Users className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">专家咨询</h3>
+                      <p className="text-sm text-muted-foreground">咨询行业顶尖专家获取专业建议</p>
+                    </div>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/pricing">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                      <Sparkles className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">升级订阅</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {dashboardData?.subscription?.plan === 'free' ? '解锁更多高级功能' : `当前: ${dashboardData?.subscription?.plan || 'Free'}`}
+                      </p>
+                    </div>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </section>
+
+        {/* Onboarding Checklist */}
+        <section className="mb-8">
+          <OnboardingChecklist />
         </section>
 
         {/* Stats Grid */}
@@ -304,14 +404,19 @@ export default function DashboardPage() {
             </div>
           ) : projects.length === 0 ? (
             <Card className="border-dashed">
-              <CardContent className="p-12 text-center">
-                <Rocket className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-medium mb-2">还没有项目</h3>
-                <p className="text-muted-foreground mb-4">创建你的第一个项目，让AI帮你实现想法</p>
-                <Button onClick={() => router.push('/create')}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  创建项目
-                </Button>
+              <CardContent className="p-0">
+                <EmptyState
+                  {...emptyStatePresets.projects}
+                  variant="card"
+                  action={{
+                    label: '创建项目',
+                    onClick: () => router.push('/create'),
+                  }}
+                  secondaryAction={{
+                    label: '浏览模板',
+                    href: '/templates',
+                  }}
+                />
               </CardContent>
             </Card>
           ) : (

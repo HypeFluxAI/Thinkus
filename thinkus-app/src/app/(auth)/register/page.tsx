@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FormField, validationRules } from '@/components/ui/form-field'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
@@ -383,61 +384,72 @@ function RegisterContent() {
             {/* Email Registration */}
             <TabsContent value="email">
               <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-slate-300">姓名</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="您的姓名"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
+                <FormField
+                  label="姓名"
+                  type="text"
+                  placeholder="您的姓名"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  rules={[
+                    validationRules.required('请输入姓名'),
+                    validationRules.minLength(2, '姓名至少2个字符'),
+                  ]}
+                  validateOnBlur
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-slate-300">邮箱</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
+                <FormField
+                  label="邮箱"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  rules={[
+                    validationRules.required('请输入邮箱'),
+                    validationRules.email(),
+                  ]}
+                  validateOnBlur
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-slate-300">密码</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="至少8个字符"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
+                <FormField
+                  label="密码"
+                  type="password"
+                  placeholder="至少8个字符，包含字母和数字"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  rules={[
+                    validationRules.required('请输入密码'),
+                    validationRules.minLength(8, '密码至少8个字符'),
+                  ]}
+                  validateOnBlur
+                  showSuccessIcon={false}
+                  hint="密码需包含字母和数字"
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-slate-300">确认密码</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="再次输入密码"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
+                <FormField
+                  label="确认密码"
+                  type="password"
+                  placeholder="再次输入密码"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  rules={[
+                    validationRules.required('请确认密码'),
+                    validationRules.match(password, '两次输入的密码不一致'),
+                  ]}
+                  validateOnBlur
+                  showSuccessIcon={false}
+                />
 
                 <Button
                   type="submit"
@@ -459,39 +471,47 @@ function RegisterContent() {
             {/* Phone Registration */}
             <TabsContent value="phone">
               <form onSubmit={handlePhoneSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phoneName" className="text-slate-300">姓名</Label>
-                  <Input
-                    id="phoneName"
-                    type="text"
-                    placeholder="您的姓名"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
+                <FormField
+                  label="姓名"
+                  type="text"
+                  placeholder="您的姓名"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  rules={[
+                    validationRules.required('请输入姓名'),
+                    validationRules.minLength(2, '姓名至少2个字符'),
+                  ]}
+                  validateOnBlur
+                />
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-slate-300">手机号</Label>
+                  <Label className="text-slate-300">手机号 <span className="text-red-400">*</span></Label>
                   <div className="flex gap-2">
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="13800138000"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      required
-                      disabled={isLoading || codeSent}
-                      className="flex-1 bg-slate-700/50 border-slate-600 text-white"
-                    />
+                    <div className="flex-1">
+                      <FormField
+                        type="tel"
+                        placeholder="13800138000"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        disabled={isLoading || codeSent}
+                        className="bg-slate-700/50 border-slate-600 text-white"
+                        rules={[
+                          validationRules.required('请输入手机号'),
+                          validationRules.phone(),
+                        ]}
+                        validateOnBlur
+                      />
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={handleSendPhoneCode}
-                      disabled={sendingCode || countdown > 0 || isLoading || !codeValidation?.valid}
-                      className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                      disabled={sendingCode || countdown > 0 || isLoading || !codeValidation?.valid || !phone}
+                      className="border-slate-600 text-slate-300 hover:bg-slate-700 shrink-0"
                     >
                       {sendingCode ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -505,49 +525,59 @@ function RegisterContent() {
                 </div>
 
                 {codeSent && (
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneCode" className="text-slate-300">验证码</Label>
-                    <Input
-                      id="phoneCode"
-                      type="text"
-                      placeholder="请输入6位验证码"
-                      value={phoneCode}
-                      onChange={(e) => setPhoneCode(e.target.value)}
-                      required
-                      disabled={isLoading}
-                      maxLength={6}
-                      className="bg-slate-700/50 border-slate-600 text-white"
-                    />
-                  </div>
+                  <FormField
+                    label="验证码"
+                    type="text"
+                    placeholder="请输入6位验证码"
+                    value={phoneCode}
+                    onChange={(e) => setPhoneCode(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    maxLength={6}
+                    className="bg-slate-700/50 border-slate-600 text-white"
+                    rules={[
+                      validationRules.required('请输入验证码'),
+                      validationRules.minLength(6, '验证码为6位数字'),
+                    ]}
+                    validateOnChange
+                    hint="验证码已发送到您的手机"
+                  />
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="phonePassword" className="text-slate-300">密码</Label>
-                  <Input
-                    id="phonePassword"
-                    type="password"
-                    placeholder="至少8个字符"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
+                <FormField
+                  label="密码"
+                  type="password"
+                  placeholder="至少8个字符，包含字母和数字"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  rules={[
+                    validationRules.required('请输入密码'),
+                    validationRules.minLength(8, '密码至少8个字符'),
+                  ]}
+                  validateOnBlur
+                  showSuccessIcon={false}
+                  hint="密码需包含字母和数字"
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="phoneConfirmPassword" className="text-slate-300">确认密码</Label>
-                  <Input
-                    id="phoneConfirmPassword"
-                    type="password"
-                    placeholder="再次输入密码"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="bg-slate-700/50 border-slate-600 text-white"
-                  />
-                </div>
+                <FormField
+                  label="确认密码"
+                  type="password"
+                  placeholder="再次输入密码"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="bg-slate-700/50 border-slate-600 text-white"
+                  rules={[
+                    validationRules.required('请确认密码'),
+                    validationRules.match(password, '两次输入的密码不一致'),
+                  ]}
+                  validateOnBlur
+                  showSuccessIcon={false}
+                />
 
                 <Button
                   type="submit"

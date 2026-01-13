@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,14 +8,46 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MessageSquare, Plus, Clock, Users, Loader2, User, UsersRound, FileText, ArrowLeft } from 'lucide-react'
-import { ExecutiveChat, MultiAgentDiscussion } from '@/components/executive'
+import {
+  MessageSquare,
+  Plus,
+  Clock,
+  Users,
+  Loader2,
+  User,
+  UsersRound,
+  FileText,
+  ArrowLeft,
+  Brain,
+  Sparkles,
+  Send,
+  Shield,
+  Play,
+  RotateCcw,
+} from 'lucide-react'
+import {
+  ExecutiveChat,
+  MultiAgentDiscussion,
+  ExecutiveDiscussionPanel,
+  DiscussionSummaryPanel,
+  ExecutiveAvatarStack,
+  DecisionConfirmDialog,
+} from '@/components/executive'
 import { ExecutiveSelector } from '@/components/executive/executive-selector'
+import {
+  DiscussionModeSelector,
+  InteractionModeSelector,
+  DISCUSSION_MODES,
+  type DiscussionMode as DepthMode,
+} from '@/components/discussion'
 import { PhaseBadge } from '@/components/project'
 import { EXECUTIVES, type AgentId } from '@/lib/config/executives'
 import { PROJECT_PHASES, type ProjectPhase } from '@/lib/config/project-phases'
+import { DECISION_LEVEL_DESCRIPTIONS, type DecisionLevel } from '@/lib/config/ai-executives'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc/client'
+import { toast } from 'sonner'
+import { useAutonomousDiscussion, DecisionClassification } from '@/hooks/use-autonomous-discussion'
 import type { IProject } from '@/lib/db/models/project'
 
 // Discussion type from API
@@ -43,8 +75,31 @@ export default function ProjectDiscussPage({ params }: { params: Promise<{ id: s
   const [currentDiscussionId, setCurrentDiscussionId] = useState<string | null>(null)
   const [selectedAgent, setSelectedAgent] = useState<AgentId | null>(null)
   const [isCreating, setIsCreating] = useState(false)
-  const [discussionMode, setDiscussionMode] = useState<'single' | 'multi'>('single')
+  const [discussionMode, setDiscussionMode] = useState<'single' | 'multi' | 'autonomous'>('autonomous')
+  const [depthMode, setDepthMode] = useState<DepthMode>('standard')
   const [isMultiAgentActive, setIsMultiAgentActive] = useState(false)
+  const [autonomousUserInput, setAutonomousUserInput] = useState('')
+
+  // 决策确认对话框
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    decision: DecisionClassification | null
+  }>({ open: false, decision: null })
+
+  // AI自治讨论 Hook
+  const autonomousDiscussion = useAutonomousDiscussion({
+    onDecisionClassified: (classification) => {
+      if (classification.level === 'L2_CONFIRM' || classification.level === 'L3_CRITICAL') {
+        setConfirmDialog({ open: true, decision: classification })
+      }
+    },
+    onSummaryComplete: () => {
+      toast.success('讨论总结已生成')
+    },
+    onError: (error) => {
+      toast.error(error)
+    },
+  })
 
   // Fetch project data
   const { data: projectData, isLoading: projectLoading, error: projectError } = trpc.project.getById.useQuery({ id: projectId })
@@ -73,9 +128,78 @@ export default function ProjectDiscussPage({ params }: { params: Promise<{ id: s
   const phaseConfig = project?.phase ? PROJECT_PHASES[project.phase] : null
   const recommendedParticipants = phaseConfig?.coreAgents || ['alex', 'bella', 'chloe'] as AgentId[]
 
+  // 开始AI自治讨论
+  const handleStartAutonomousDiscussion = useCallback(() => {
+    if (!topic.trim()) {
+      toast.error('请输入讨论主题')
+      return
+    }
+
+    const phase = project?.phase || 'development'
+    const discussionParticipants = selectedParticipants.length > 0
+      ? selectedParticipants
+      : PROJECT_PHASES[phase]?.coreAgents || ['mike', 'david', 'elena'] as AgentId[]
+
+    autonomousDiscussion.startDiscussion({
+      topic: topic.trim(),
+      description: context.trim() || undefined,
+      projectPhase: phase as any,
+      participants: discussionParticipants,
+      maxRounds: DISCUSSION_MODES[depthMode].rounds,
+    })
+  }, [topic, context, selectedParticipants, project?.phase, autonomousDiscussion, depthMode])
+
+  // 用户在自治讨论中发言
+  const handleAutonomousUserSubmit = useCallback(() => {
+    if (!autonomousUserInput.trim() || autonomousDiscussion.isDiscussing) return
+
+    autonomousDiscussion.continueDiscussion(autonomousUserInput.trim())
+    setAutonomousUserInput('')
+  }, [autonomousUserInput, autonomousDiscussion])
+
+  // 重新开始自治讨论
+  const handleAutonomousRestart = useCallback(() => {
+    autonomousDiscussion.clearDiscussion()
+    setTopic('')
+    setContext('')
+  }, [autonomousDiscussion])
+
+  // 决策确认处理
+  const handleDecisionApprove = async (decisionId: string, notes?: string) => {
+    try {
+      await fetch('/api/executives/dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', decisionId, notes }),
+      })
+      toast.success('决策已批准')
+    } catch {
+      toast.error('操作失败')
+    }
+  }
+
+  const handleDecisionReject = async (decisionId: string, reason?: string) => {
+    try {
+      await fetch('/api/executives/dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', decisionId, reason }),
+      })
+      toast.success('决策已拒绝')
+    } catch {
+      toast.error('操作失败')
+    }
+  }
+
   // Start a new discussion
   const handleStartDiscussion = async () => {
     if (!topic.trim()) return
+
+    // AI自治模式
+    if (discussionMode === 'autonomous') {
+      handleStartAutonomousDiscussion()
+      return
+    }
 
     if (discussionMode === 'multi') {
       // Multi-agent mode - activate the multi-agent discussion component
@@ -232,27 +356,27 @@ export default function ProjectDiscussPage({ params }: { params: Promise<{ id: s
                     <CardDescription>邀请高管参与讨论</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Discussion Mode Toggle */}
-                    <div className="flex gap-2">
-                      <Button
-                        variant={discussionMode === 'single' ? 'default' : 'outline'}
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => setDiscussionMode('single')}
-                      >
-                        <User className="h-4 w-4 mr-1" />
-                        单人对话
-                      </Button>
-                      <Button
-                        variant={discussionMode === 'multi' ? 'default' : 'outline'}
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => setDiscussionMode('multi')}
-                      >
-                        <UsersRound className="h-4 w-4 mr-1" />
-                        多人讨论
-                      </Button>
+                    {/* Interaction Mode Toggle */}
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">互动模式</label>
+                      <InteractionModeSelector
+                        value={discussionMode}
+                        onChange={setDiscussionMode}
+                      />
                     </div>
+
+                    {/* Discussion Depth Mode (only for autonomous) */}
+                    {discussionMode === 'autonomous' && (
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">讨论深度</label>
+                        <DiscussionModeSelector
+                          value={depthMode}
+                          onChange={setDepthMode}
+                          showDetails={false}
+                          compact
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <label className="text-sm font-medium">讨论主题</label>
@@ -305,16 +429,27 @@ export default function ProjectDiscussPage({ params }: { params: Promise<{ id: s
                     <Button
                       className="w-full"
                       onClick={handleStartDiscussion}
-                      disabled={!topic.trim() || isCreating || (discussionMode === 'single' && !selectedAgent)}
+                      disabled={
+                        !topic.trim() ||
+                        isCreating ||
+                        autonomousDiscussion.isDiscussing ||
+                        (discussionMode === 'single' && !selectedAgent)
+                      }
                     >
-                      {isCreating ? (
+                      {isCreating || autonomousDiscussion.isDiscussing ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : discussionMode === 'autonomous' ? (
+                        <Brain className="h-4 w-4 mr-2" />
                       ) : discussionMode === 'multi' ? (
                         <UsersRound className="h-4 w-4 mr-2" />
                       ) : (
                         <MessageSquare className="h-4 w-4 mr-2" />
                       )}
-                      {discussionMode === 'multi' ? '开始多人讨论' : '开始对话'}
+                      {discussionMode === 'autonomous'
+                        ? `开始${DISCUSSION_MODES[depthMode].nameCn}讨论`
+                        : discussionMode === 'multi'
+                          ? '开始多人讨论'
+                          : '开始对话'}
                     </Button>
                   </CardContent>
                 </Card>
@@ -394,41 +529,177 @@ export default function ProjectDiscussPage({ params }: { params: Promise<{ id: s
 
           {/* Right Panel - Chat Interface */}
           <div className="lg:col-span-2">
-            <Card className="h-[calc(100vh-10rem)]">
-              {isMultiAgentActive ? (
-                <MultiAgentDiscussion
-                  projectId={projectId}
-                  topic={topic}
-                  context={context}
-                  participants={selectedParticipants.length > 0 ? selectedParticipants : undefined}
-                  autoSchedule={selectedParticipants.length === 0}
-                  onComplete={(summary) => {
-                    console.log('Discussion completed:', summary)
-                    setIsMultiAgentActive(false)
-                  }}
-                  className="h-full"
-                />
-              ) : selectedAgent ? (
-                <ExecutiveChat
-                  agentId={selectedAgent}
-                  projectId={projectId}
-                  discussionId={currentDiscussionId || undefined}
-                  context={context}
-                  placeholder={`向 ${EXECUTIVES[selectedAgent].nameCn} 提问...`}
-                  className="h-full"
-                />
-              ) : (
-                <CardContent className="h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h3 className="font-medium mb-2">选择一位高管开始对话</h3>
-                    <p className="text-sm text-muted-foreground max-w-sm">
-                      从左侧选择一位高管进行快速咨询，或发起多人讨论
-                    </p>
+            {/* AI自治讨论面板 */}
+            {discussionMode === 'autonomous' && (autonomousDiscussion.messages.length > 0 || autonomousDiscussion.isDiscussing) ? (
+              <div className="space-y-4">
+                {/* 讨论状态栏 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-5 w-5 text-primary" />
+                    <span className="font-medium">AI自治讨论</span>
+                    <Badge variant="outline">
+                      第 {autonomousDiscussion.currentRound} / {autonomousDiscussion.maxRounds} 轮
+                    </Badge>
+                    {autonomousDiscussion.consensusLevel > 0 && (
+                      <Badge variant="secondary">共识度 {autonomousDiscussion.consensusLevel}%</Badge>
+                    )}
                   </div>
-                </CardContent>
-              )}
-            </Card>
+                  <div className="flex items-center gap-2">
+                    {autonomousDiscussion.isDiscussing && (
+                      <Button variant="outline" size="sm" onClick={autonomousDiscussion.stopDiscussion}>
+                        停止讨论
+                      </Button>
+                    )}
+                    {!autonomousDiscussion.isDiscussing && (
+                      <Button variant="outline" size="sm" onClick={handleAutonomousRestart}>
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        重新开始
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 讨论主面板 */}
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                  <div className="xl:col-span-2 space-y-4">
+                    <Card className="h-[calc(100vh-18rem)]">
+                      <ExecutiveDiscussionPanel
+                        messages={autonomousDiscussion.messages}
+                        participants={autonomousDiscussion.participants}
+                        currentRound={autonomousDiscussion.currentRound}
+                        maxRounds={autonomousDiscussion.maxRounds}
+                        speakingAgentId={autonomousDiscussion.speakingAgentId}
+                        consensusLevel={autonomousDiscussion.consensusLevel}
+                        keyInsights={autonomousDiscussion.keyInsights}
+                        className="h-full"
+                      />
+                    </Card>
+
+                    {/* 用户输入 */}
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">
+                            {autonomousDiscussion.isDiscussing
+                              ? '高管讨论中，请稍候...'
+                              : '你可以加入讨论，提出问题或补充信息'}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={autonomousUserInput}
+                            onChange={(e) => setAutonomousUserInput(e.target.value)}
+                            placeholder="输入你的想法或问题..."
+                            disabled={autonomousDiscussion.isDiscussing}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                handleAutonomousUserSubmit()
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={handleAutonomousUserSubmit}
+                            disabled={autonomousDiscussion.isDiscussing || !autonomousUserInput.trim()}
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* 右侧边栏 - 决策和总结 */}
+                  <div className="space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 14rem)' }}>
+                    {/* 决策结果 */}
+                    {autonomousDiscussion.decisions.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-primary" />
+                            决策分级
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {autonomousDiscussion.decisions.map((d, idx) => {
+                            const levelConfig = DECISION_LEVEL_DESCRIPTIONS[d.level]
+                            return (
+                              <div key={idx} className="p-2 rounded border text-sm">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <span className="flex-1">{d.decision}</span>
+                                  <Badge
+                                    variant={d.level === 'L3_CRITICAL' ? 'destructive' : d.level === 'L2_CONFIRM' ? 'default' : 'secondary'}
+                                    className="shrink-0"
+                                  >
+                                    {levelConfig?.name}
+                                  </Badge>
+                                </div>
+                                <span className="text-xs text-muted-foreground">风险: {d.score}/100</span>
+                              </div>
+                            )
+                          })}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* 讨论总结 */}
+                    {autonomousDiscussion.summary && (
+                      <DiscussionSummaryPanel summary={autonomousDiscussion.summary} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Card className="h-[calc(100vh-10rem)]">
+                {isMultiAgentActive ? (
+                  <MultiAgentDiscussion
+                    projectId={projectId}
+                    topic={topic}
+                    context={context}
+                    participants={selectedParticipants.length > 0 ? selectedParticipants : undefined}
+                    autoSchedule={selectedParticipants.length === 0}
+                    onComplete={(summary) => {
+                      console.log('Discussion completed:', summary)
+                      setIsMultiAgentActive(false)
+                    }}
+                    className="h-full"
+                  />
+                ) : selectedAgent ? (
+                  <ExecutiveChat
+                    agentId={selectedAgent}
+                    projectId={projectId}
+                    discussionId={currentDiscussionId || undefined}
+                    context={context}
+                    placeholder={`向 ${EXECUTIVES[selectedAgent].nameCn} 提问...`}
+                    className="h-full"
+                  />
+                ) : (
+                  <CardContent className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      {discussionMode === 'autonomous' ? (
+                        <>
+                          <Brain className="h-12 w-12 mx-auto mb-4 text-primary opacity-50" />
+                          <h3 className="font-medium mb-2">AI自治讨论</h3>
+                          <p className="text-sm text-muted-foreground max-w-sm">
+                            在左侧输入讨论主题，高管团队将自主进行深度讨论
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                          <h3 className="font-medium mb-2">选择一位高管开始对话</h3>
+                          <p className="text-sm text-muted-foreground max-w-sm">
+                            从左侧选择一位高管进行快速咨询，或发起多人讨论
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            )}
 
             {/* Participant Switcher (when in discussion) */}
             {currentDiscussionId && selectedAgent && !isMultiAgentActive && (
@@ -459,6 +730,26 @@ export default function ProjectDiscussPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </main>
+
+      {/* 决策确认对话框 */}
+      {confirmDialog.decision && (
+        <DecisionConfirmDialog
+          open={confirmDialog.open}
+          onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}
+          decision={{
+            id: `decision-${Date.now()}`,
+            title: confirmDialog.decision.decision,
+            description: `风险评分: ${confirmDialog.decision.score}/100`,
+            level: confirmDialog.decision.level,
+            proposedBy: 'mike' as AgentId,
+            proposedAction: confirmDialog.decision.decision,
+            riskFactors: confirmDialog.decision.factors,
+            projectName: project?.name,
+          }}
+          onApprove={handleDecisionApprove}
+          onReject={handleDecisionReject}
+        />
+      )}
     </div>
   )
 }

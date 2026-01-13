@@ -4,12 +4,7 @@ import { authOptions } from '@/lib/auth/options'
 import dbConnect from '@/lib/db/connection'
 import User from '@/lib/db/models/user'
 import { VerificationCode } from '@/lib/db/models'
-
-// 简单的邮箱格式验证
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
+import { sendVerificationEmail, isValidEmail } from '@/lib/email/config'
 
 // POST /api/user/bind-email - 发送绑定邮箱验证码
 export async function POST(req: NextRequest) {
@@ -57,13 +52,12 @@ export async function POST(req: NextRequest) {
       throw error
     }
 
-    // TODO: 发送邮件验证码
-    // 目前先打印到控制台，实际部署时需要集成邮件服务
-    console.log(`\n${'='.repeat(50)}`)
-    console.log(`📧 Email Verification Code`)
-    console.log(`   Email: ${normalizedEmail}`)
-    console.log(`   Code:  ${verificationCode.code}`)
-    console.log(`${'='.repeat(50)}\n`)
+    // 发送邮件验证码
+    const emailResult = await sendVerificationEmail(normalizedEmail, verificationCode.code)
+    if (!emailResult.success) {
+      console.error('Failed to send email:', emailResult.error)
+      // 不阻止流程，在开发环境仍然返回成功
+    }
 
     return NextResponse.json({
       success: true,

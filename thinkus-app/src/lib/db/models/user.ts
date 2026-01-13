@@ -15,12 +15,22 @@ export interface NotificationSettings {
   weeklyReport: boolean
 }
 
+// 自动化设置接口
+export interface AutomationSettings {
+  autoStandup: boolean
+  autoDecision: boolean
+  autoMemoryCleanup: boolean
+  autoSkillDistillation: boolean
+}
+
 // 用户设置接口
 export interface UserSettings {
   language: 'zh' | 'en'
   theme: 'light' | 'dark' | 'system'
   timezone: string
   notifications: NotificationSettings
+  automation: AutomationSettings
+  autoExecution: boolean
 }
 
 // 用户统计接口
@@ -102,6 +112,17 @@ const notificationSettingsSchema = new Schema(
   { _id: false }
 )
 
+// 自动化设置 Schema
+const automationSettingsSchema = new Schema(
+  {
+    autoStandup: { type: Boolean, default: true },
+    autoDecision: { type: Boolean, default: true },
+    autoMemoryCleanup: { type: Boolean, default: true },
+    autoSkillDistillation: { type: Boolean, default: true },
+  },
+  { _id: false }
+)
+
 // 用户设置 Schema
 const userSettingsSchema = new Schema(
   {
@@ -109,6 +130,8 @@ const userSettingsSchema = new Schema(
     theme: { type: String, enum: ['light', 'dark', 'system'], default: 'system' },
     timezone: { type: String, default: 'Asia/Shanghai' },
     notifications: { type: notificationSettingsSchema, default: () => ({}) },
+    automation: { type: automationSettingsSchema, default: () => ({}) },
+    autoExecution: { type: Boolean, default: true },
   },
   { _id: false }
 )

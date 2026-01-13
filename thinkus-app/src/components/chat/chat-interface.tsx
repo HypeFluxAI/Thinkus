@@ -14,6 +14,29 @@ export interface Message {
   content: string
   speaker?: string
   isStreaming?: boolean
+  timestamp?: Date | string
+}
+
+function formatTime(date?: Date | string): string {
+  if (!date) return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatRelativeTime(date?: Date | string): string {
+  if (!date) return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  if (hours < 24) return `${hours}小时前`
+  if (days < 7) return `${days}天前`
+  return formatTime(d)
 }
 
 interface ChatInterfaceProps {
@@ -97,24 +120,35 @@ export function ChatInterface({
               </AvatarFallback>
             </Avatar>
 
-            <Card
-              className={cn(
-                'max-w-[80%] p-3',
-                message.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
+            <div className={cn(
+              'flex flex-col gap-1',
+              message.role === 'user' ? 'items-end' : 'items-start'
+            )}>
+              <Card
+                className={cn(
+                  'max-w-[80%] p-3',
+                  message.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted'
+                )}
+              >
+                {message.speaker && (
+                  <div className="text-xs font-medium mb-1 opacity-70">
+                    {message.speaker}
+                  </div>
+                )}
+                <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                {message.isStreaming && (
+                  <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1" />
+                )}
+              </Card>
+              {/* Timestamp */}
+              {message.timestamp && !message.isStreaming && (
+                <span className="text-xs text-muted-foreground px-1">
+                  {formatRelativeTime(message.timestamp)}
+                </span>
               )}
-            >
-              {message.speaker && (
-                <div className="text-xs font-medium mb-1 opacity-70">
-                  {message.speaker}
-                </div>
-              )}
-              <p className="whitespace-pre-wrap text-sm">{message.content}</p>
-              {message.isStreaming && (
-                <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1" />
-              )}
-            </Card>
+            </div>
           </div>
         ))}
 

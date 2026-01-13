@@ -1,185 +1,54 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { use } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
-  CheckCircle2,
-  Circle,
-  Loader2,
   Code,
   Database,
   Layout,
   TestTube,
   Rocket,
   Clock,
-  RefreshCw,
+  Circle,
 } from 'lucide-react'
 
-interface DevelopmentPhase {
-  id: string
-  name: string
-  description: string
-  status: 'pending' | 'in_progress' | 'completed'
-  icon: React.ElementType
-  tasks: Array<{
-    name: string
-    status: 'pending' | 'in_progress' | 'completed'
-  }>
-}
-
-const DEVELOPMENT_PHASES: DevelopmentPhase[] = [
+const PHASE_PREVIEW = [
   {
-    id: 'planning',
+    icon: Layout,
     name: '架构规划',
     description: 'AI分析需求，规划技术架构',
-    status: 'completed',
-    icon: Layout,
-    tasks: [
-      { name: '需求分析', status: 'completed' },
-      { name: '技术选型', status: 'completed' },
-      { name: '架构设计', status: 'completed' },
-    ],
   },
   {
-    id: 'database',
+    icon: Database,
     name: '数据库设计',
     description: '设计数据模型和数据库结构',
-    status: 'completed',
-    icon: Database,
-    tasks: [
-      { name: '数据模型设计', status: 'completed' },
-      { name: '数据库创建', status: 'completed' },
-      { name: '索引优化', status: 'completed' },
-    ],
   },
   {
-    id: 'backend',
+    icon: Code,
     name: '后端开发',
     description: '构建API和业务逻辑',
-    status: 'in_progress',
-    icon: Code,
-    tasks: [
-      { name: 'API路由搭建', status: 'completed' },
-      { name: '业务逻辑实现', status: 'in_progress' },
-      { name: '认证授权', status: 'pending' },
-    ],
   },
   {
-    id: 'frontend',
+    icon: Layout,
     name: '前端开发',
     description: '构建用户界面',
-    status: 'pending',
-    icon: Layout,
-    tasks: [
-      { name: '页面组件开发', status: 'pending' },
-      { name: '状态管理', status: 'pending' },
-      { name: 'UI/UX优化', status: 'pending' },
-    ],
   },
   {
-    id: 'testing',
+    icon: TestTube,
     name: '测试验证',
     description: '功能测试和性能优化',
-    status: 'pending',
-    icon: TestTube,
-    tasks: [
-      { name: '单元测试', status: 'pending' },
-      { name: '集成测试', status: 'pending' },
-      { name: '性能优化', status: 'pending' },
-    ],
   },
   {
-    id: 'deployment',
+    icon: Rocket,
     name: '部署上线',
     description: '部署到生产环境',
-    status: 'pending',
-    icon: Rocket,
-    tasks: [
-      { name: '环境配置', status: 'pending' },
-      { name: '部署发布', status: 'pending' },
-      { name: '域名配置', status: 'pending' },
-    ],
   },
 ]
 
 export default function ProgressPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = use(params)
-  const router = useRouter()
-  const [phases, setPhases] = useState<DevelopmentPhase[]>(DEVELOPMENT_PHASES)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState(new Date())
-
-  // Calculate overall progress
-  const totalTasks = phases.reduce((acc, phase) => acc + phase.tasks.length, 0)
-  const completedTasks = phases.reduce(
-    (acc, phase) => acc + phase.tasks.filter(t => t.status === 'completed').length,
-    0
-  )
-  const progressPercentage = Math.round((completedTasks / totalTasks) * 100)
-
-  // Get current phase
-  const currentPhase = phases.find(p => p.status === 'in_progress') || phases[0]
-
-  // Simulate progress updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhases(prev => {
-        const newPhases = [...prev]
-        // Find current in_progress task and potentially complete it
-        for (const phase of newPhases) {
-          const inProgressTask = phase.tasks.find(t => t.status === 'in_progress')
-          if (inProgressTask && Math.random() > 0.7) {
-            inProgressTask.status = 'completed'
-            // Start next pending task
-            const nextPending = phase.tasks.find(t => t.status === 'pending')
-            if (nextPending) {
-              nextPending.status = 'in_progress'
-            } else {
-              // Phase complete, start next phase
-              phase.status = 'completed'
-              const nextPhase = newPhases.find(p => p.status === 'pending')
-              if (nextPhase) {
-                nextPhase.status = 'in_progress'
-                const firstTask = nextPhase.tasks[0]
-                if (firstTask) firstTask.status = 'in_progress'
-              }
-            }
-            setLastUpdated(new Date())
-            break
-          }
-        }
-        return newPhases
-      })
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  const handleRefresh = () => {
-    setIsRefreshing(true)
-    setTimeout(() => {
-      setLastUpdated(new Date())
-      setIsRefreshing(false)
-    }, 1000)
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />
-      case 'in_progress':
-        return <Loader2 className="h-5 w-5 text-primary animate-spin" />
-      default:
-        return <Circle className="h-5 w-5 text-muted-foreground" />
-    }
-  }
-
-  const isCompleted = progressPercentage === 100
 
   return (
     <div className="bg-background">
@@ -191,149 +60,87 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
               <div className="flex items-center gap-3">
                 <Rocket className="h-5 w-5 text-primary" />
                 <h1 className="font-semibold text-lg">开发进度</h1>
-                <Badge variant="secondary">
-                  {isCompleted ? '已完成' : '开发中'}
+                <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <Clock className="h-3 w-3 mr-1" />
+                  即将推出
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 实时追踪项目开发状态
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              刷新
-            </Button>
           </div>
         </div>
       </div>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Progress Overview */}
-        <Card className="mb-6">
+        {/* Coming Soon Notice */}
+        <Card className="mb-8 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardContent className="p-6 text-center">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Rocket className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">开发进度追踪即将上线</h2>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              我们正在开发实时进度追踪系统，让您随时了解项目开发状态。
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Progress Preview */}
+        <Card className="mb-6 opacity-60">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
               <div>
-                <h2 className="text-2xl font-bold">{progressPercentage}%</h2>
-                <p className="text-muted-foreground">
-                  {isCompleted ? '项目已完成！' : `当前: ${currentPhase?.name}`}
-                </p>
+                <h2 className="text-2xl font-bold text-muted-foreground">--%</h2>
+                <p className="text-muted-foreground">等待项目开始开发</p>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>
-                  最后更新: {lastUpdated.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <span>--:--</span>
               </div>
             </div>
-            <Progress value={progressPercentage} className="h-3" />
+            <Progress value={0} className="h-3" />
             <div className="flex justify-between mt-2 text-sm text-muted-foreground">
-              <span>{completedTasks} / {totalTasks} 任务完成</span>
-              <span>预计剩余: {isCompleted ? '0' : Math.max(1, Math.ceil((100 - progressPercentage) / 20))} 小时</span>
+              <span>-- / -- 任务完成</span>
+              <span>预计剩余: --</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Phase Timeline */}
-        <div className="space-y-4">
-          {phases.map((phase, index) => {
-            const PhaseIcon = phase.icon
-            return (
-              <Card
-                key={phase.id}
-                className={phase.status === 'in_progress' ? 'border-primary' : ''}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          phase.status === 'completed'
-                            ? 'bg-green-100 dark:bg-green-900/30'
-                            : phase.status === 'in_progress'
-                            ? 'bg-primary/20'
-                            : 'bg-muted'
-                        }`}
-                      >
-                        <PhaseIcon
-                          className={`h-5 w-5 ${
-                            phase.status === 'completed'
-                              ? 'text-green-500'
-                              : phase.status === 'in_progress'
-                              ? 'text-primary'
-                              : 'text-muted-foreground'
-                          }`}
-                        />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          {phase.name}
-                          {phase.status === 'in_progress' && (
-                            <Badge variant="default" className="text-xs">
-                              进行中
-                            </Badge>
-                          )}
-                        </CardTitle>
-                        <CardDescription>{phase.description}</CardDescription>
-                      </div>
+        {/* Phase Timeline Preview */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">开发阶段预览</CardTitle>
+            <CardDescription>项目将经历以下开发阶段</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {PHASE_PREVIEW.map((phase, index) => (
+                <div
+                  key={phase.name}
+                  className="flex items-center gap-4 p-4 rounded-lg bg-muted/50"
+                >
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center">
+                      <phase.icon className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    {getStatusIcon(phase.status)}
+                    {index < PHASE_PREVIEW.length - 1 && (
+                      <div className="absolute top-10 left-1/2 w-px h-4 bg-border -translate-x-1/2" />
+                    )}
                   </div>
-                </CardHeader>
-
-                {(phase.status === 'in_progress' || phase.status === 'completed') && (
-                  <CardContent className="pt-0">
-                    <div className="ml-[52px] space-y-2">
-                      {phase.tasks.map((task, taskIndex) => (
-                        <div
-                          key={taskIndex}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          {task.status === 'completed' ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          ) : task.status === 'in_progress' ? (
-                            <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                          ) : (
-                            <Circle className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          <span
-                            className={
-                              task.status === 'completed'
-                                ? 'text-muted-foreground line-through'
-                                : task.status === 'in_progress'
-                                ? 'text-foreground font-medium'
-                                : 'text-muted-foreground'
-                            }
-                          >
-                            {task.name}
-                          </span>
-                        </div>
-                      ))}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">{phase.name}</h3>
                     </div>
-                  </CardContent>
-                )}
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Completion CTA */}
-        {isCompleted && (
-          <Card className="mt-6 border-green-500/50 bg-green-500/5">
-            <CardContent className="p-6 text-center">
-              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <h3 className="text-xl font-bold mb-2">项目开发完成！</h3>
-              <p className="text-muted-foreground mb-4">
-                您的产品已准备就绪，点击下方按钮查看和下载
-              </p>
-              <Link href={`/projects/${projectId}/complete`}>
-                <Button size="lg">
-                  <Rocket className="mr-2 h-5 w-5" />
-                  查看完成项目
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
+                    <p className="text-sm text-muted-foreground">{phase.description}</p>
+                  </div>
+                  <Circle className="h-5 w-5 text-muted-foreground" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
