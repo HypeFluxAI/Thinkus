@@ -103,3 +103,27 @@ export {
   type QueueStats,
   type ContributionType,
 } from './invitation-service'
+
+// 文档处理服务 (Phase 2 新增)
+export {
+  documentProcessor,
+  DocumentProcessorService,
+  type FileType,
+  type UploadedFile,
+  type ContentType,
+  type FeatureItem,
+  type UIElement,
+  type DataField,
+  type Reference,
+  type StructuredContent,
+  type ProcessedResult,
+  type IntegratedRequirement,
+} from './document-processor'
+
+// 需求整合器 (Phase 2 新增)
+export {
+  requirementIntegrator,
+  RequirementIntegratorService,
+  type IntegrationInput,
+  type IntegrationOutput,
+} from './requirement-integrator'
