@@ -374,22 +374,97 @@ export async function POST(req: NextRequest) {
             totalTokensUsed += synthesisTokens
           }
 
-          // Extract JSON from synthesis
+          // Extract JSON from synthesis with improved error handling
           let proposal = null
+          let jsonExtractError = null
+
+          // 尝试多种方式提取 JSON
           const jsonMatch = synthesisContent.match(/```json\s*([\s\S]*?)\s*```/)
-          if (jsonMatch) {
+          let jsonString = jsonMatch ? jsonMatch[1] : null
+
+          // 如果没有找到 ```json``` 块，尝试找纯 JSON 对象
+          if (!jsonString) {
+            const jsonObjectMatch = synthesisContent.match(/\{[\s\S]*"projectName"[\s\S]*"features"[\s\S]*\}/)
+            if (jsonObjectMatch) {
+              jsonString = jsonObjectMatch[0]
+            }
+          }
+
+          if (jsonString) {
             try {
-              proposal = JSON.parse(jsonMatch[1])
+              // 清理可能的问题字符
+              jsonString = jsonString
+                .replace(/[\x00-\x1F\x7F]/g, '') // 移除控制字符
+                .replace(/,\s*([}\]])/g, '$1') // 移除尾随逗号
+                .trim()
+
+              proposal = JSON.parse(jsonString)
+
+              // 确保 features 数组存在且格式正确
+              if (!proposal.features || !Array.isArray(proposal.features)) {
+                console.warn('[Discuss API] proposal.features is missing or invalid, using original features')
+                proposal.features = features.map((f, index) => ({
+                  id: `feature-${Date.now()}-${index}`,
+                  name: f.name,
+                  description: f.description,
+                  priority: f.priority || 'P1',
+                  approved: true,
+                }))
+              } else {
+                // 确保每个 feature 有必要的字段
+                proposal.features = proposal.features.map((f: any, index: number) => ({
+                  id: f.id || `feature-${Date.now()}-${index}`,
+                  name: f.name || `功能${index + 1}`,
+                  description: f.description || '',
+                  priority: f.priority || 'P1',
+                  approved: f.approved !== false,
+                  expertNotes: f.expertNotes || '',
+                }))
+              }
+
               // Calculate price based on feature token consumption
-              const features = proposal.features || []
-              const priceResult = calculateProjectPrice(features)
+              const priceResult = calculateProjectPrice(proposal.features)
               proposal.estimatedPrice = priceResult.finalPrice
               proposal.estimatedTokens = priceResult.estimatedTokens
               proposal.tokenCost = priceResult.tokenCost
               proposal.priceBreakdown = priceResult.breakdown
               proposal.tokenUsage = totalTokensUsed
-            } catch {
-              // JSON parse failed
+            } catch (e) {
+              jsonExtractError = e
+              console.error('[Discuss API] JSON parse failed:', e, '\nJSON string:', jsonString?.substring(0, 500))
+            }
+          } else {
+            console.warn('[Discuss API] No JSON found in synthesis content')
+          }
+
+          // 如果 JSON 解析失败，使用原始功能创建基本方案
+          if (!proposal) {
+            console.warn('[Discuss API] Creating fallback proposal from original features')
+            const priceResult = calculateProjectPrice(features)
+            proposal = {
+              projectName: '新项目',
+              positioning: requirement.substring(0, 200),
+              features: features.map((f, index) => ({
+                id: `feature-${Date.now()}-${index}`,
+                name: f.name,
+                description: f.description,
+                priority: f.priority || 'P1',
+                approved: true,
+              })),
+              techStack: {
+                frontend: ['React', 'Next.js', 'TypeScript'],
+                backend: ['Node.js', 'tRPC'],
+                database: ['MongoDB'],
+              },
+              risks: ['AI 生成的方案可能需要人工调整'],
+              recommendations: ['建议与专家进一步讨论细节'],
+              estimatedComplexity: 'L2',
+              estimatedPrice: priceResult.finalPrice,
+              estimatedTokens: priceResult.estimatedTokens,
+              tokenCost: priceResult.tokenCost,
+              priceBreakdown: priceResult.breakdown,
+              tokenUsage: totalTokensUsed,
+              _parseError: jsonExtractError?.toString(),
             }
           }
 

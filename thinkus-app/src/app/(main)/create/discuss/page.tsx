@@ -30,6 +30,14 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
+import {
+  getSessionData,
+  saveSessionData,
+  updateProgress,
+  saveProposal,
+  clearProgress,
+  migrateOldSessionData,
+} from '@/lib/utils/discussion-session'
 
 interface Proposal {
   projectName: string
@@ -98,48 +106,37 @@ export default function DiscussPage() {
   const [dataLoaded, setDataLoaded] = useState(false)
 
   useEffect(() => {
-    // Try to load from sessionStorage first
-    const savedData = sessionStorage.getItem('createDiscussionData')
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData)
-        setRequirement(parsed.requirement || '')
-        setFeatures(parsed.features || [])
-        setMode(parsed.mode || 'brainstorm')
+    // 先尝试迁移旧数据
+    migrateOldSessionData()
 
-        // Try to restore discussion progress if available
-        const progressData = sessionStorage.getItem('discussionProgress')
-        if (progressData) {
-          try {
-            const progress = JSON.parse(progressData)
-            if (progress.messages && progress.messages.length > 0) {
-              // Restore messages with proper structure
-              const restoredMessages = progress.messages.map((m: any, index: number) => ({
-                id: `restored-${index}`,
-                expertId: m.expertId,
-                content: m.content,
-                timestamp: new Date(),
-                isStreaming: false,
-                round: m.round,
-                isUser: m.isUser,
-              }))
-              setMessages(restoredMessages)
-              setCurrentRound(progress.currentRound || 0)
-              if (progress.keyInsights) setKeyInsights(progress.keyInsights)
-              if (progress.discussionHistory) setDiscussionHistory(progress.discussionHistory)
-              if (progress.proposal) setProposal(progress.proposal)
-              toast.info('已恢复上次讨论进度')
-            }
-          } catch {
-            // Ignore progress restoration errors
-          }
-        }
+    // 从新的会话存储系统加载数据
+    const sessionData = getSessionData()
+    if (sessionData && sessionData.requirement) {
+      setRequirement(sessionData.requirement)
+      setFeatures(sessionData.features as Feature[] || [])
+      setMode((sessionData.mode as DiscussionMode) || 'brainstorm')
 
-        setDataLoaded(true)
-        return
-      } catch {
-        // Fall through to URL params
+      // 恢复讨论进度
+      if (sessionData.progress?.messages && sessionData.progress.messages.length > 0) {
+        const restoredMessages = sessionData.progress.messages.map((m, index) => ({
+          id: `restored-${index}`,
+          expertId: m.expertId,
+          content: m.content,
+          timestamp: new Date(),
+          isStreaming: false,
+          round: m.round,
+          isUser: m.isUser,
+        }))
+        setMessages(restoredMessages)
+        setCurrentRound(sessionData.progress.currentRound || 0)
+        if (sessionData.progress.keyInsights) setKeyInsights(sessionData.progress.keyInsights)
+        if (sessionData.progress.discussionHistory) setDiscussionHistory(sessionData.progress.discussionHistory)
+        if (sessionData.progress.proposal) setProposal(sessionData.progress.proposal as Proposal)
+        toast.info('已恢复上次讨论进度')
       }
+
+      setDataLoaded(true)
+      return
     }
 
     // Fallback to URL params for backward compatibility
@@ -358,10 +355,10 @@ export default function DiscussPage() {
     }
   }, [dataLoaded, requirement, features, isDiscussing, messages.length, startDiscussion, hasAutoStarted])
 
-  // Auto-save discussion progress to sessionStorage
+  // Auto-save discussion progress to session storage
   useEffect(() => {
     if (messages.length > 0 || proposal) {
-      const progressData = {
+      updateProgress({
         messages: messages.map(m => ({
           expertId: m.expertId,
           content: m.content,
@@ -372,8 +369,7 @@ export default function DiscussPage() {
         currentRound,
         keyInsights,
         discussionHistory,
-      }
-      sessionStorage.setItem('discussionProgress', JSON.stringify(progressData))
+      })
     }
   }, [messages, proposal, currentRound, keyInsights, discussionHistory])
 
@@ -397,21 +393,22 @@ export default function DiscussPage() {
 
   const handleConfirm = () => {
     if (proposal) {
-      // 保存讨论参数到 sessionStorage，方便从确认页返回
-      const discussionParams = {
-        requirement,
-        features: JSON.stringify(features),
-        mode,
-        projectType: searchParams.get('projectType') || 'web',
-        complexity: searchParams.get('complexity') || 'L2',
-      }
-      sessionStorage.setItem('discussionParams', JSON.stringify(discussionParams))
+      // 保存讨论参数和方案到会话存储，方便从确认页返回
+      saveSessionData({
+        discussionParams: {
+          requirement,
+          features: JSON.stringify(features),
+          mode,
+          projectType: searchParams.get('projectType') || 'web',
+          complexity: searchParams.get('complexity') || 'L2',
+        },
+      })
 
-      // Clear discussion progress since we're moving forward
-      sessionStorage.removeItem('discussionProgress')
+      // 清除讨论进度（进入确认页面后）
+      clearProgress()
 
-      // Store proposal in sessionStorage to avoid URL length issues
-      sessionStorage.setItem('currentProposal', JSON.stringify(proposal))
+      // 保存最终方案
+      saveProposal(proposal)
       router.push('/create/confirm')
     }
   }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ChatInterface, Message } from '@/components/chat/chat-interface'
@@ -12,6 +12,12 @@ import { toast } from 'sonner'
 import { PhaseSelector } from '@/components/project'
 import { type ProjectPhase } from '@/lib/config/project-phases'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  createNewSession,
+  saveSessionData,
+  cleanupExpiredSessions,
+  migrateOldSessionData,
+} from '@/lib/utils/discussion-session'
 
 type CreateStep = 'phase' | 'describe'
 
@@ -26,6 +32,14 @@ export default function CreateProjectPage() {
   const [projectId, setProjectId] = useState<string | null>(null)
 
   const createProjectMutation = trpc.project.create.useMutation()
+
+  // 初始化：清理过期会话，迁移旧数据，创建新会话
+  useEffect(() => {
+    migrateOldSessionData()
+    cleanupExpiredSessions()
+    // 进入创建页面时创建新会话，确保每个新项目有独立的会话
+    createNewSession()
+  }, [])
 
   const extractFeatures = (text: string): Feature[] => {
     const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/)
@@ -179,14 +193,14 @@ export default function CreateProjectPage() {
       .map((m) => m.content)
       .join('\n')
 
-    // Store data in sessionStorage to avoid URL length limits
-    sessionStorage.setItem('createDiscussionData', JSON.stringify({
+    // 使用新的会话存储系统，自动关联当前会话ID
+    saveSessionData({
       requirement,
       features,
       mode: 'standard',
-      projectId,
+      projectId: projectId || undefined,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
-    }))
+    })
 
     // Navigate to expert discussion page with minimal params
     router.push('/create/discuss')

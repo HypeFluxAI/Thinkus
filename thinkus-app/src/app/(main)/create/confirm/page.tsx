@@ -37,6 +37,13 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import {
+  getSessionData,
+  getProposal,
+  saveProposal,
+  migrateOldSessionData,
+  clearSession,
+} from '@/lib/utils/discussion-session'
 
 interface Feature {
   id: string
@@ -133,19 +140,11 @@ function recalculatePrice(features: Feature[]): {
   }
 }
 
-// 从 URL 或 sessionStorage 获取讨论参数
+// 从会话存储获取讨论参数
 function getDiscussionParams() {
-  if (typeof window !== 'undefined') {
-    const saved = sessionStorage.getItem('discussionParams')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return null
-      }
-    }
-  }
-  return null
+  if (typeof window === 'undefined') return null
+  const sessionData = getSessionData()
+  return sessionData?.discussionParams || null
 }
 
 export default function ConfirmPage() {
@@ -158,27 +157,30 @@ export default function ConfirmPage() {
   const [hasChanges, setHasChanges] = useState(false)
 
   useEffect(() => {
+    // 先尝试迁移旧数据
+    migrateOldSessionData()
+
     const proposalParam = searchParams.get('proposal')
     if (proposalParam) {
       try {
         const parsedProposal = JSON.parse(decodeURIComponent(proposalParam))
         setProposal(parsedProposal)
-        // 保存到 sessionStorage，方便返回时恢复
-        sessionStorage.setItem('currentProposal', JSON.stringify(parsedProposal))
+        // 保存到会话存储
+        saveProposal(parsedProposal)
       } catch {
-        // 尝试从 sessionStorage 恢复
-        const saved = sessionStorage.getItem('currentProposal')
+        // 尝试从会话存储恢复
+        const saved = getProposal()
         if (saved) {
-          setProposal(JSON.parse(saved))
+          setProposal(saved as Proposal)
         } else {
           toast.error('方案数据解析失败')
         }
       }
     } else {
-      // 尝试从 sessionStorage 恢复
-      const saved = sessionStorage.getItem('currentProposal')
+      // 尝试从会话存储恢复
+      const saved = getProposal()
       if (saved) {
-        setProposal(JSON.parse(saved))
+        setProposal(saved as Proposal)
       }
     }
   }, [searchParams])
@@ -209,7 +211,7 @@ export default function ConfirmPage() {
       ...priceInfo,
     }
     setProposal(updatedProposal)
-    sessionStorage.setItem('currentProposal', JSON.stringify(updatedProposal))
+    saveProposal(updatedProposal)
     setHasChanges(true)
     setEditingFeature(null)
     toast.success('功能已更新，价格已重新计算')
@@ -227,7 +229,7 @@ export default function ConfirmPage() {
       ...priceInfo,
     }
     setProposal(updatedProposal)
-    sessionStorage.setItem('currentProposal', JSON.stringify(updatedProposal))
+    saveProposal(updatedProposal)
     setHasChanges(true)
     toast.success('功能已删除，价格已重新计算')
   }
@@ -237,7 +239,7 @@ export default function ConfirmPage() {
     if (!proposal) return
     const updatedProposal = { ...proposal, ...updates }
     setProposal(updatedProposal)
-    sessionStorage.setItem('currentProposal', JSON.stringify(updatedProposal))
+    saveProposal(updatedProposal)
     setHasChanges(true)
   }
 
