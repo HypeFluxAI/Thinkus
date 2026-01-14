@@ -32,11 +32,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlan, SubscriptionPlanConfig
     price: 0,
     priceYearly: 0,
     features: {
-      maxProjects: 1,
-      maxDiscussionsPerMonth: 5,
-      maxExecutives: 3,
-      maxMessagesPerDay: 20,
-      memoryEnabled: false,
+      maxProjects: 3,
+      maxDiscussionsPerMonth: 100,    // 至少100次讨论才有意义
+      maxExecutives: 6,
+      maxMessagesPerDay: 50,
+      memoryEnabled: true,            // 开启记忆功能
       prioritySupport: false,
       customBranding: false,
     },
@@ -47,10 +47,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlan, SubscriptionPlanConfig
     price: 29,
     priceYearly: 290, // ~17% 折扣
     features: {
-      maxProjects: 5,
-      maxDiscussionsPerMonth: 50,
-      maxExecutives: 6,
-      maxMessagesPerDay: 100,
+      maxProjects: 10,
+      maxDiscussionsPerMonth: 500,
+      maxExecutives: 12,
+      maxMessagesPerDay: 200,
       memoryEnabled: true,
       prioritySupport: false,
       customBranding: false,
@@ -62,10 +62,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlan, SubscriptionPlanConfig
     price: 99,
     priceYearly: 990, // ~17% 折扣
     features: {
-      maxProjects: 20,
-      maxDiscussionsPerMonth: 200,
-      maxExecutives: 12,
-      maxMessagesPerDay: 500,
+      maxProjects: 50,
+      maxDiscussionsPerMonth: 2000,
+      maxExecutives: 18,
+      maxMessagesPerDay: 1000,
       memoryEnabled: true,
       prioritySupport: true,
       customBranding: false,

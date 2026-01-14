@@ -325,6 +325,16 @@ export default function DiscussPage() {
 
   const handleConfirm = () => {
     if (proposal) {
+      // 保存讨论参数到 sessionStorage，方便从确认页返回
+      const discussionParams = {
+        requirement,
+        features: featuresParam,
+        mode,
+        projectType: searchParams.get('projectType') || 'web',
+        complexity: searchParams.get('complexity') || 'L2',
+      }
+      sessionStorage.setItem('discussionParams', JSON.stringify(discussionParams))
+
       const proposalParam = encodeURIComponent(JSON.stringify(proposal))
       router.push(`/create/confirm?proposal=${proposalParam}`)
     }

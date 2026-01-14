@@ -18,8 +18,14 @@ import {
   getDiscussionSummaryPrompt,
   getDecisionClassificationPrompt,
 } from '@/lib/ai/executives/prompts'
+import * as gemini from '@/lib/ai/gemini'
+import { Project } from '@/lib/db/models/project'
+import { connectDB } from '@/lib/db/connect'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -72,6 +78,7 @@ export async function POST(req: NextRequest) {
 
     const body: ExecutiveDiscussionRequest = await req.json()
     const {
+      projectId,
       topic,
       description,
       projectPhase = 'development',
@@ -80,6 +87,24 @@ export async function POST(req: NextRequest) {
       existingHistory = [],
       userMessage,
     } = body
+
+    // 获取项目信息（如果有 projectId）
+    let projectContext: { name: string; description: string; phase: string } | undefined
+    if (projectId) {
+      try {
+        await connectDB()
+        const project = await Project.findById(projectId)
+        if (project) {
+          projectContext = {
+            name: project.name,
+            description: project.description || topic,
+            phase: project.phase || projectPhase,
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch project:', e)
+      }
+    }
 
     // 选择参与讨论的高管
     const participants = requestedParticipants || selectParticipants({
@@ -197,6 +222,7 @@ export async function POST(req: NextRequest) {
             const systemPrompt = buildAgentPrompt({
               executive: executive || AI_EXECUTIVES[participants[0]],
               topic,
+              project: projectContext,
             })
 
             // 构建用户提示
@@ -208,38 +234,63 @@ export async function POST(req: NextRequest) {
                 content: m.content,
               })),
               orchestratorGuidance: orchestratorResult.prompt,
+              projectContext,
             })
 
             let fullContent = ''
             let tokensUsed = 0
 
             // 流式生成高管回复
-            const stream = await anthropic.messages.stream({
-              model: 'claude-sonnet-4-20250514',
-              max_tokens: 512,
-              temperature: 0.8,
-              system: systemPrompt,
-              messages: [{ role: 'user', content: userPrompt }],
-            })
+            if (useGemini) {
+              // 使用 Gemini
+              const generator = gemini.streamMessage({
+                system: systemPrompt,
+                max_tokens: 2048,
+                temperature: 0.8,
+                messages: [{ role: 'user', content: userPrompt }],
+              })
 
-            for await (const event of stream) {
-              if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-                fullContent += event.delta.text
-                sendEvent('expert_message_delta', {
-                  agentId: currentAgent || participants[0],
-                  content: event.delta.text,
-                  round,
-                })
+              for await (const event of generator) {
+                if (event.type === 'content_block_delta' && event.delta?.text) {
+                  fullContent += event.delta.text
+                  sendEvent('expert_message_delta', {
+                    agentId: currentAgent || participants[0],
+                    content: event.delta.text,
+                    round,
+                  })
+                }
               }
-              if (event.type === 'message_delta' && event.usage) {
-                tokensUsed = event.usage.output_tokens
+              tokensUsed = Math.ceil(fullContent.length / 4) // 估算
+              totalTokensUsed += tokensUsed
+            } else {
+              // 使用 Anthropic
+              const stream = await anthropic!.messages.stream({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 2048,
+                temperature: 0.8,
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userPrompt }],
+              })
+
+              for await (const event of stream) {
+                if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                  fullContent += event.delta.text
+                  sendEvent('expert_message_delta', {
+                    agentId: currentAgent || participants[0],
+                    content: event.delta.text,
+                    round,
+                  })
+                }
+                if (event.type === 'message_delta' && event.usage) {
+                  tokensUsed = event.usage.output_tokens
+                }
               }
+
+              // 获取最终token使用量
+              const finalMessage = await stream.finalMessage()
+              tokensUsed = finalMessage.usage.input_tokens + finalMessage.usage.output_tokens
+              totalTokensUsed += tokensUsed
             }
-
-            // 获取最终token使用量
-            const finalMessage = await stream.finalMessage()
-            tokensUsed = finalMessage.usage.input_tokens + finalMessage.usage.output_tokens
-            totalTokensUsed += tokensUsed
 
             // 记录消息
             discussionHistory.push({
@@ -277,22 +328,41 @@ export async function POST(req: NextRequest) {
           )
 
           let summaryContent = ''
-          const summaryStream = await anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 2048,
-            temperature: 0.3,
-            system: '你是一个专业的讨论总结者。请分析高管团队的讨论，提取关键决策、行动项和共识。',
-            messages: [{ role: 'user', content: summaryPrompt }],
-          })
 
-          for await (const event of summaryStream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              summaryContent += event.delta.text
+          if (useGemini) {
+            // 使用 Gemini
+            const generator = gemini.streamMessage({
+              system: '你是一个专业的讨论总结者。请分析高管团队的讨论，提取关键决策、行动项和共识。',
+              max_tokens: 2048,
+              temperature: 0.3,
+              messages: [{ role: 'user', content: summaryPrompt }],
+            })
+
+            for await (const event of generator) {
+              if (event.type === 'content_block_delta' && event.delta?.text) {
+                summaryContent += event.delta.text
+              }
             }
-          }
+            totalTokensUsed += Math.ceil(summaryContent.length / 4)
+          } else {
+            // 使用 Anthropic
+            const summaryStream = await anthropic!.messages.stream({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 2048,
+              temperature: 0.3,
+              system: '你是一个专业的讨论总结者。请分析高管团队的讨论，提取关键决策、行动项和共识。',
+              messages: [{ role: 'user', content: summaryPrompt }],
+            })
 
-          const summaryFinal = await summaryStream.finalMessage()
-          totalTokensUsed += summaryFinal.usage.input_tokens + summaryFinal.usage.output_tokens
+            for await (const event of summaryStream) {
+              if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                summaryContent += event.delta.text
+              }
+            }
+
+            const summaryFinal = await summaryStream.finalMessage()
+            totalTokensUsed += summaryFinal.usage.input_tokens + summaryFinal.usage.output_tokens
+          }
 
           // 解析总结结果
           let summary = null
@@ -381,12 +451,7 @@ async function getOrchestratorDecision(
     roundNumber,
   })
 
-  try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 512,
-      temperature: 0.5,
-      system: `你是高管讨论的编排者。负责：
+  const systemPrompt = `你是高管讨论的编排者。负责：
 1. 决定下一个发言的高管
 2. 提供发言指导
 3. 判断讨论是否应该继续
@@ -402,11 +467,29 @@ async function getOrchestratorDecision(
   "keyInsights": ["洞察1", "洞察2"],
   "consensusLevel": 0-100
 }
-\`\`\``,
-      messages: [{ role: 'user', content: prompt }],
-    })
+\`\`\``
 
-    const content = response.content[0].type === 'text' ? response.content[0].text : ''
+  try {
+    let content = ''
+
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: systemPrompt,
+        max_tokens: 512,
+        temperature: 0.5,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 512,
+        temperature: 0.5,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)
 
     if (jsonMatch) {
@@ -445,15 +528,27 @@ async function classifyDecision(
   })
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 512,
-      temperature: 0.3,
-      system: '你是决策风险评估专家。分析决策的风险级别，返回JSON格式结果。',
-      messages: [{ role: 'user', content: prompt }],
-    })
+    let content = ''
 
-    const content = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: '你是决策风险评估专家。分析决策的风险级别，返回JSON格式结果。',
+        max_tokens: 512,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 512,
+        temperature: 0.3,
+        system: '你是决策风险评估专家。分析决策的风险级别，返回JSON格式结果。',
+        messages: [{ role: 'user', content: prompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
+
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)
 
     if (jsonMatch) {

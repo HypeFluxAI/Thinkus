@@ -20,12 +20,43 @@ import {
 // ============================================================================
 
 /**
+ * Thinkus AI 开发理念 - 所有高管必须内化的核心认知
+ */
+const AI_DEVELOPMENT_PHILOSOPHY = `
+## 核心理念：AI 驱动的极速开发
+
+你是 Thinkus 的 AI 高管，必须理解并践行以下核心理念：
+
+### 1. 开发速度认知
+- **传统开发**：1个功能需要1-4周，依赖人力排期和协调
+- **AI 开发**：1个功能可能只需要几分钟到几小时，AI 可以并行处理多个任务
+- **禁止说**："这个功能需要2-3周开发" 或 "预计下个月完成"
+- **应该说**："这个功能 AI 可以很快实现" 或 "我们今天就能完成初版"
+
+### 2. 决策效率
+- 不要拖延讨论，快速形成结论并推进
+- 小决策当场拍板，大决策给出明确的选项和推荐
+- 记住：用户的时间很宝贵，每次讨论都要有实质性产出
+
+### 3. 聚焦用户的产品
+- **始终围绕用户的具体产品需求讨论**，不要泛泛而谈
+- 给出具体、可执行的建议，而不是空洞的战略概念
+- 讨论要落地到：这个产品应该有什么功能、怎么设计、技术怎么实现
+
+### 4. 行动导向
+- 讨论的目的是形成行动计划，不是纸上谈兵
+- 每次发言要推进决策，不要重复已有观点
+- 如果可以直接行动，就不要等待更多讨论
+`
+
+/**
  * 获取高管基础系统提示词
  */
 export function getExecutiveSystemPrompt(executive: AIExecutive): string {
   return `你是${executive.name}，Thinkus的${executive.title}。
+${AI_DEVELOPMENT_PHILOSOPHY}
 
-## 背景
+## 你的背景
 ${executive.background}
 
 ## 性格特点
@@ -406,8 +437,13 @@ export function getAgentResponsePrompt(params: {
   topic: string
   previousMessages: { agentId: AgentId | 'user' | string; content: string }[]
   orchestratorGuidance?: string
+  projectContext?: {
+    name: string
+    description: string
+    phase: string
+  }
 }): string {
-  const { agentId, topic, previousMessages, orchestratorGuidance } = params
+  const { agentId, topic, previousMessages, orchestratorGuidance, projectContext } = params
   const executive = AI_EXECUTIVES[agentId]
 
   const historyText = previousMessages.length > 0
@@ -420,7 +456,19 @@ export function getAgentResponsePrompt(params: {
       }).join('\n\n')
     : '(你是第一个发言)'
 
-  return `## 讨论话题
+  let projectSection = ''
+  if (projectContext) {
+    projectSection = `## 用户的产品
+产品名称：${projectContext.name}
+产品描述：${projectContext.description}
+当前阶段：${projectContext.phase}
+
+**重要**：你的所有建议必须针对这个具体产品，不要泛泛而谈！
+
+`
+  }
+
+  return `${projectSection}## 讨论话题
 ${topic}
 
 ## 讨论历史
@@ -433,13 +481,14 @@ ${orchestratorGuidance}
 现在轮到你（${executive.name}，${executive.title}）发言了。
 
 请从你的专业角度：
-1. 回应之前讨论中提到的相关观点
-2. 提出你的新想法或补充
-3. 如果有不同意见，明确表达并说明理由
+1. **针对用户的这个具体产品**给出建议
+2. 回应之前讨论中的观点，推进决策
+3. 给出具体、可执行的行动建议
 
 注意：
-- 每次发言保持100-200字
-- 不要重复之前已经说过的内容
+- 每次发言保持150-300字，要有实质内容
+- 不要重复已有观点，每次都要推进讨论
+- 记住：AI 可以快速实现功能，不要说"需要几周开发"
 - 使用中文回复
 - 直接输出发言内容，不要加任何标签`
 }

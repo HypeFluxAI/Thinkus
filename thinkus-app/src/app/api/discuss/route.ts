@@ -17,8 +17,13 @@ import {
   getSynthesizerPrompt,
   getOrchestratorPrompt,
 } from '@/lib/ai/experts/prompts'
+import * as gemini from '@/lib/ai/gemini'
+import { calculateProjectPrice } from '@/lib/stripe/config'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -213,32 +218,56 @@ export async function POST(req: NextRequest) {
 
                 const maxTokens = isBrainstorming ? 512 : 256
 
-                const stream = await anthropic.messages.stream({
-                  model: 'claude-sonnet-4-20250514',
-                  max_tokens: maxTokens,
-                  temperature: isBrainstorming ? 0.9 : 0.8,
-                  system: systemPrompt,
-                  messages: [{ role: 'user', content: userPrompt }],
-                })
+                if (useGemini) {
+                  // 使用 Gemini
+                  const generator = gemini.streamMessage({
+                    system: systemPrompt,
+                    max_tokens: maxTokens,
+                    temperature: isBrainstorming ? 0.9 : 0.8,
+                    messages: [{ role: 'user', content: userPrompt }],
+                  })
 
-                for await (const event of stream) {
-                  if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-                    fullContent += event.delta.text
-                    sendEvent('expert_message_delta', {
-                      expertId: expert.id,
-                      content: event.delta.text,
-                      round: currentRound,
-                    })
+                  for await (const event of generator) {
+                    if (event.type === 'content_block_delta' && event.delta?.text) {
+                      fullContent += event.delta.text
+                      sendEvent('expert_message_delta', {
+                        expertId: expert.id,
+                        content: event.delta.text,
+                        round: currentRound,
+                      })
+                    }
                   }
-                  if (event.type === 'message_delta' && event.usage) {
-                    tokensUsed = event.usage.output_tokens
+                  tokensUsed = Math.ceil(fullContent.length / 4)
+                  totalTokensUsed += tokensUsed
+                } else {
+                  // 使用 Anthropic
+                  const stream = await anthropic!.messages.stream({
+                    model: 'claude-sonnet-4-20250514',
+                    max_tokens: maxTokens,
+                    temperature: isBrainstorming ? 0.9 : 0.8,
+                    system: systemPrompt,
+                    messages: [{ role: 'user', content: userPrompt }],
+                  })
+
+                  for await (const event of stream) {
+                    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                      fullContent += event.delta.text
+                      sendEvent('expert_message_delta', {
+                        expertId: expert.id,
+                        content: event.delta.text,
+                        round: currentRound,
+                      })
+                    }
+                    if (event.type === 'message_delta' && event.usage) {
+                      tokensUsed = event.usage.output_tokens
+                    }
                   }
+
+                  // Get final token usage
+                  const finalMessage = await stream.finalMessage()
+                  tokensUsed = finalMessage.usage.input_tokens + finalMessage.usage.output_tokens
+                  totalTokensUsed += tokensUsed
                 }
-
-                // Get final token usage
-                const finalMessage = await stream.finalMessage()
-                tokensUsed = finalMessage.usage.input_tokens + finalMessage.usage.output_tokens
-                totalTokensUsed += tokensUsed
 
                 discussionHistory.push({
                   expertId: expert.id,
@@ -306,24 +335,44 @@ export async function POST(req: NextRequest) {
           let synthesisContent = ''
           let synthesisTokens = 0
 
-          const synthesisStream = await anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 4096,
-            temperature: 0.3,
-            system: '你是一个专业的产品方案整理者。请根据专家讨论结果生成结构化的产品方案。',
-            messages: [{ role: 'user', content: synthesisPrompt }],
-          })
+          if (useGemini) {
+            // 使用 Gemini
+            const generator = gemini.streamMessage({
+              system: '你是一个专业的产品方案整理者。请根据专家讨论结果生成结构化的产品方案。',
+              max_tokens: 4096,
+              temperature: 0.3,
+              messages: [{ role: 'user', content: synthesisPrompt }],
+            })
 
-          for await (const event of synthesisStream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              synthesisContent += event.delta.text
-              sendEvent('synthesis_delta', { content: event.delta.text })
+            for await (const event of generator) {
+              if (event.type === 'content_block_delta' && event.delta?.text) {
+                synthesisContent += event.delta.text
+                sendEvent('synthesis_delta', { content: event.delta.text })
+              }
             }
-          }
+            synthesisTokens = Math.ceil(synthesisContent.length / 4)
+            totalTokensUsed += synthesisTokens
+          } else {
+            // 使用 Anthropic
+            const synthesisStream = await anthropic!.messages.stream({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 4096,
+              temperature: 0.3,
+              system: '你是一个专业的产品方案整理者。请根据专家讨论结果生成结构化的产品方案。',
+              messages: [{ role: 'user', content: synthesisPrompt }],
+            })
 
-          const synthesisFinal = await synthesisStream.finalMessage()
-          synthesisTokens = synthesisFinal.usage.input_tokens + synthesisFinal.usage.output_tokens
-          totalTokensUsed += synthesisTokens
+            for await (const event of synthesisStream) {
+              if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                synthesisContent += event.delta.text
+                sendEvent('synthesis_delta', { content: event.delta.text })
+              }
+            }
+
+            const synthesisFinal = await synthesisStream.finalMessage()
+            synthesisTokens = synthesisFinal.usage.input_tokens + synthesisFinal.usage.output_tokens
+            totalTokensUsed += synthesisTokens
+          }
 
           // Extract JSON from synthesis
           let proposal = null
@@ -331,11 +380,13 @@ export async function POST(req: NextRequest) {
           if (jsonMatch) {
             try {
               proposal = JSON.parse(jsonMatch[1])
-              // Calculate price based on token usage (2x token cost)
-              // Approximate cost: $3 per 1M input tokens, $15 per 1M output tokens for Claude Sonnet
-              // Simplified: ~$0.01 per 1000 tokens average
-              const tokenCost = totalTokensUsed * 0.00001 // $0.01 per 1000 tokens
-              proposal.estimatedPrice = Math.ceil(tokenCost * 2 * 100) / 100 // 2x cost, rounded to cents
+              // Calculate price based on feature token consumption
+              const features = proposal.features || []
+              const priceResult = calculateProjectPrice(features)
+              proposal.estimatedPrice = priceResult.finalPrice
+              proposal.estimatedTokens = priceResult.estimatedTokens
+              proposal.tokenCost = priceResult.tokenCost
+              proposal.priceBreakdown = priceResult.breakdown
               proposal.tokenUsage = totalTokensUsed
             } catch {
               // JSON parse failed
@@ -398,15 +449,27 @@ async function getOrchestratorDecision(
   )
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 512,
-      temperature: 0.5,
-      system: '你是讨论编排者，负责决定讨论流程。返回JSON格式的决策。',
-      messages: [{ role: 'user', content: prompt }],
-    })
+    let content = ''
 
-    const content = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: '你是讨论编排者，负责决定讨论流程。返回JSON格式的决策。',
+        max_tokens: 512,
+        temperature: 0.5,
+        messages: [{ role: 'user', content: prompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 512,
+        temperature: 0.5,
+        system: '你是讨论编排者，负责决定讨论流程。返回JSON格式的决策。',
+        messages: [{ role: 'user', content: prompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
+
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)
 
     if (jsonMatch) {
