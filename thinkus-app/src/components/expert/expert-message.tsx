@@ -129,7 +129,7 @@ export function ExpertMessage({
             </span>
           )}
         </div>
-        <Card className={cn('p-3 overflow-hidden', expert.color.replace('bg-', 'border-l-4 border-l-'))}>
+        <Card className={cn('p-3', expert.color.replace('bg-', 'border-l-4 border-l-'))}>
           <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words">
             {renderMarkdown(content)}
           </div>
