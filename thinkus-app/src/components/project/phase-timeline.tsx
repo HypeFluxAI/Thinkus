@@ -86,9 +86,9 @@ export function PhaseTimeline({
                 <div
                   className={cn(
                     'w-10 h-10 rounded-full flex items-center justify-center border-2',
-                    status === 'completed' && 'bg-green-500/20 border-green-500 text-green-400',
-                    status === 'current' && 'bg-blue-500/20 border-blue-500 text-blue-400',
-                    status === 'upcoming' && 'bg-slate-700 border-slate-600 text-slate-500'
+                    status === 'completed' && 'bg-green-50 border-green-500 text-green-600 dark:bg-green-500/20 dark:text-green-400',
+                    status === 'current' && 'bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400',
+                    status === 'upcoming' && 'bg-gray-100 border-gray-300 text-gray-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-500'
                   )}
                 >
                   {status === 'completed' ? (
@@ -103,7 +103,7 @@ export function PhaseTimeline({
                   <div
                     className={cn(
                       'w-0.5 flex-1 my-2',
-                      status === 'completed' ? 'bg-green-500' : 'bg-slate-700'
+                      status === 'completed' ? 'bg-green-500' : 'bg-gray-200 dark:bg-slate-700'
                     )}
                   />
                 )}
@@ -115,23 +115,23 @@ export function PhaseTimeline({
                   <h4
                     className={cn(
                       'font-medium',
-                      status === 'completed' && 'text-green-400',
-                      status === 'current' && 'text-white',
-                      status === 'upcoming' && 'text-slate-500'
+                      status === 'completed' && 'text-green-600 dark:text-green-400',
+                      status === 'current' && 'text-blue-600 dark:text-blue-400',
+                      status === 'upcoming' && 'text-gray-400 dark:text-slate-500'
                     )}
                   >
                     {config.nameCn}
                   </h4>
                   {history && (
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-gray-400 dark:text-slate-500">
                       {formatDate(history.startedAt)}
                       {history.completedAt && ` - ${formatDate(history.completedAt)}`}
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-slate-400 mt-1">{config.description}</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{config.description}</p>
                 {history && (
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                     耗时: {getDuration(history)}
                   </p>
                 )}
@@ -158,9 +158,9 @@ export function PhaseTimeline({
               <div
                 className={cn(
                   'w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all',
-                  status === 'completed' && 'bg-green-500/20 border-green-500 text-green-400',
-                  status === 'current' && 'bg-blue-500/20 border-blue-500 text-blue-400 scale-110',
-                  status === 'upcoming' && 'bg-slate-800 border-slate-600 text-slate-500'
+                  status === 'completed' && 'bg-green-50 border-green-500 text-green-600 dark:bg-green-500/20 dark:text-green-400',
+                  status === 'current' && 'bg-blue-50 border-blue-500 text-blue-600 scale-110 dark:bg-blue-500/20 dark:text-blue-400',
+                  status === 'upcoming' && 'bg-gray-100 border-gray-300 text-gray-400 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-500'
                 )}
                 title={config.nameCn}
               >
@@ -173,7 +173,7 @@ export function PhaseTimeline({
               <span
                 className={cn(
                   'text-xs mt-2 whitespace-nowrap',
-                  status === 'current' ? 'text-white font-medium' : 'text-slate-500'
+                  status === 'current' ? 'text-blue-600 font-medium dark:text-blue-400' : 'text-gray-400 dark:text-slate-500'
                 )}
               >
                 {config.nameCn}
@@ -185,7 +185,7 @@ export function PhaseTimeline({
               <div
                 className={cn(
                   'h-0.5 flex-1 mx-2',
-                  status === 'completed' ? 'bg-green-500' : 'bg-slate-700'
+                  status === 'completed' ? 'bg-green-500' : 'bg-gray-200 dark:bg-slate-700'
                 )}
               />
             )}

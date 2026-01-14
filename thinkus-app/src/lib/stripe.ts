@@ -1,10 +1,27 @@
 import Stripe from 'stripe'
 import { SUBSCRIPTION_PLANS, type SubscriptionPlan } from '@/lib/db/models/subscription'
 
-// Stripe 客户端
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-12-15.clover',
-  typescript: true,
+// Stripe 客户端 (懒加载)
+let _stripe: Stripe | null = null
+
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not configured')
+    }
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-12-15.clover',
+      typescript: true,
+    })
+  }
+  return _stripe
+}
+
+// 保持向后兼容
+export const stripe = new Proxy({} as Stripe, {
+  get(_, prop) {
+    return getStripe()[prop as keyof Stripe]
+  },
 })
 
 // Stripe 价格 ID 配置 (需要在 Stripe Dashboard 中创建)
