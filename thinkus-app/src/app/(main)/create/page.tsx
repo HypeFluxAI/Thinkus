@@ -179,11 +179,17 @@ export default function CreateProjectPage() {
       .map((m) => m.content)
       .join('\n')
 
-    // Navigate to expert discussion page with parameters
-    const featuresParam = encodeURIComponent(JSON.stringify(features))
-    router.push(
-      `/create/discuss?requirement=${encodeURIComponent(requirement)}&features=${featuresParam}&mode=standard`
-    )
+    // Store data in sessionStorage to avoid URL length limits
+    sessionStorage.setItem('createDiscussionData', JSON.stringify({
+      requirement,
+      features,
+      mode: 'standard',
+      projectId,
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+    }))
+
+    // Navigate to expert discussion page with minimal params
+    router.push('/create/discuss')
   }
 
   // Phase Selection Step

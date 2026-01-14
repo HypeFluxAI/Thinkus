@@ -28,7 +28,6 @@ import {
   Brain,
   Target,
 } from 'lucide-react'
-import Link from 'next/link'
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
 
@@ -93,19 +92,71 @@ export default function DiscussPage() {
     round?: number
   }>>([])
 
-  // Get data from URL params (passed from create page)
-  const requirement = searchParams.get('requirement') || ''
-  const featuresParam = searchParams.get('features') || '[]'
-  const mode: DiscussionMode = (searchParams.get('mode') as DiscussionMode) || 'brainstorm'
+  // Get data from sessionStorage (preferred) or URL params (fallback)
+  const [requirement, setRequirement] = useState('')
+  const [mode, setMode] = useState<DiscussionMode>('brainstorm')
+  const [dataLoaded, setDataLoaded] = useState(false)
 
   useEffect(() => {
+    // Try to load from sessionStorage first
+    const savedData = sessionStorage.getItem('createDiscussionData')
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData)
+        setRequirement(parsed.requirement || '')
+        setFeatures(parsed.features || [])
+        setMode(parsed.mode || 'brainstorm')
+
+        // Try to restore discussion progress if available
+        const progressData = sessionStorage.getItem('discussionProgress')
+        if (progressData) {
+          try {
+            const progress = JSON.parse(progressData)
+            if (progress.messages && progress.messages.length > 0) {
+              // Restore messages with proper structure
+              const restoredMessages = progress.messages.map((m: any, index: number) => ({
+                id: `restored-${index}`,
+                expertId: m.expertId,
+                content: m.content,
+                timestamp: new Date(),
+                isStreaming: false,
+                round: m.round,
+                isUser: m.isUser,
+              }))
+              setMessages(restoredMessages)
+              setCurrentRound(progress.currentRound || 0)
+              if (progress.keyInsights) setKeyInsights(progress.keyInsights)
+              if (progress.discussionHistory) setDiscussionHistory(progress.discussionHistory)
+              if (progress.proposal) setProposal(progress.proposal)
+              toast.info('已恢复上次讨论进度')
+            }
+          } catch {
+            // Ignore progress restoration errors
+          }
+        }
+
+        setDataLoaded(true)
+        return
+      } catch {
+        // Fall through to URL params
+      }
+    }
+
+    // Fallback to URL params for backward compatibility
+    const urlRequirement = searchParams.get('requirement') || ''
+    const featuresParam = searchParams.get('features') || '[]'
+    const urlMode = (searchParams.get('mode') as DiscussionMode) || 'brainstorm'
+
+    setRequirement(urlRequirement)
+    setMode(urlMode)
     try {
       const parsedFeatures = JSON.parse(decodeURIComponent(featuresParam))
       setFeatures(parsedFeatures)
     } catch {
       setFeatures([])
     }
-  }, [featuresParam])
+    setDataLoaded(true)
+  }, [searchParams])
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -298,12 +349,33 @@ export default function DiscussPage() {
     }
   }, [requirement, features, mode, discussionHistory])
 
-  // Auto-start discussion on mount
+  // Auto-start discussion on mount (wait for data to be loaded, skip if restored)
+  const [hasAutoStarted, setHasAutoStarted] = useState(false)
   useEffect(() => {
-    if (requirement && features.length > 0 && !isDiscussing && messages.length === 0) {
+    if (dataLoaded && requirement && features.length > 0 && !isDiscussing && messages.length === 0 && !hasAutoStarted) {
+      setHasAutoStarted(true)
       startDiscussion()
     }
-  }, [requirement, features, isDiscussing, messages.length, startDiscussion])
+  }, [dataLoaded, requirement, features, isDiscussing, messages.length, startDiscussion, hasAutoStarted])
+
+  // Auto-save discussion progress to sessionStorage
+  useEffect(() => {
+    if (messages.length > 0 || proposal) {
+      const progressData = {
+        messages: messages.map(m => ({
+          expertId: m.expertId,
+          content: m.content,
+          round: m.round,
+          isUser: m.isUser,
+        })),
+        proposal,
+        currentRound,
+        keyInsights,
+        discussionHistory,
+      }
+      sessionStorage.setItem('discussionProgress', JSON.stringify(progressData))
+    }
+  }, [messages, proposal, currentRound, keyInsights, discussionHistory])
 
   const handleUserSubmit = () => {
     if (!userInput.trim() || !canUserSpeak || isDiscussing) return
@@ -328,15 +400,19 @@ export default function DiscussPage() {
       // 保存讨论参数到 sessionStorage，方便从确认页返回
       const discussionParams = {
         requirement,
-        features: featuresParam,
+        features: JSON.stringify(features),
         mode,
         projectType: searchParams.get('projectType') || 'web',
         complexity: searchParams.get('complexity') || 'L2',
       }
       sessionStorage.setItem('discussionParams', JSON.stringify(discussionParams))
 
-      const proposalParam = encodeURIComponent(JSON.stringify(proposal))
-      router.push(`/create/confirm?proposal=${proposalParam}`)
+      // Clear discussion progress since we're moving forward
+      sessionStorage.removeItem('discussionProgress')
+
+      // Store proposal in sessionStorage to avoid URL length issues
+      sessionStorage.setItem('currentProposal', JSON.stringify(proposal))
+      router.push('/create/confirm')
     }
   }
 
@@ -348,11 +424,9 @@ export default function DiscussPage() {
       <header className="border-b sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/create">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
             <div className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-primary" />
               <span className="font-semibold">专家讨论</span>
