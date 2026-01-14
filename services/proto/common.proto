@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package thinkus;
+
+option go_package = "github.com/thinkus/services/pkg/proto";
+
+message Empty {}
+
+message Error {
+  string code = 1;
+  string message = 2;
+}
+
+message Pagination {
+  int32 page = 1;
+  int32 limit = 2;
+  int32 total = 3;
+}

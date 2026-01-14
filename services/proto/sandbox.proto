@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package thinkus.sandbox;
+
+import "common.proto";
+
+option go_package = "github.com/thinkus/services/pkg/proto/sandbox";
+
+// 沙盒管理服务
+service SandboxService {
+  // 创建沙盒
+  rpc Create(CreateSandboxRequest) returns (Sandbox);
+
+  // 获取或创建沙盒
+  rpc GetOrCreate(GetOrCreateRequest) returns (Sandbox);
+
+  // 获取沙盒信息
+  rpc Get(GetSandboxRequest) returns (Sandbox);
+
+  // 执行命令
+  rpc Exec(ExecRequest) returns (ExecResult);
+
+  // 流式执行命令
+  rpc ExecStream(ExecRequest) returns (stream ExecOutput);
+
+  // 写文件
+  rpc WriteFile(WriteFileRequest) returns (thinkus.Empty);
+
+  // 读文件
+  rpc ReadFile(ReadFileRequest) returns (FileContent);
+
+  // 列出文件
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+
+  // 暂停沙盒
+  rpc Pause(SandboxIdRequest) returns (thinkus.Empty);
+
+  // 恢复沙盒
+  rpc Resume(SandboxIdRequest) returns (thinkus.Empty);
+
+  // 销毁沙盒
+  rpc Destroy(SandboxIdRequest) returns (thinkus.Empty);
+
+  // 导出沙盒
+  rpc Export(SandboxIdRequest) returns (ExportResponse);
+
+  // 订阅沙盒事件
+  rpc SubscribeEvents(SandboxIdRequest) returns (stream SandboxEvent);
+}
+
+message CreateSandboxRequest {
+  string project_id = 1;
+  string user_id = 2;
+  SandboxConfig config = 3;
+}
+
+message SandboxConfig {
+  string image = 1;
+  int32 cpu_limit = 2;
+  int32 memory_limit = 3;
+  int32 timeout = 4;
+}
+
+message GetOrCreateRequest {
+  string project_id = 1;
+  string user_id = 2;
+  SandboxConfig config = 3;
+}
+
+message GetSandboxRequest {
+  string sandbox_id = 1;
+}
+
+message SandboxIdRequest {
+  string sandbox_id = 1;
+}
+
+message Sandbox {
+  string id = 1;
+  string project_id = 2;
+  string user_id = 3;
+  string status = 4;
+  string image = 5;
+  int64 created_at = 6;
+  int64 last_active_at = 7;
+}
+
+message ExecRequest {
+  string sandbox_id = 1;
+  string command = 2;
+  int32 timeout = 3;
+}
+
+message ExecResult {
+  int32 exit_code = 1;
+  string stdout = 2;
+  string stderr = 3;
+  int32 duration = 4;
+}
+
+message ExecOutput {
+  string type = 1;
+  string data = 2;
+}
+
+message WriteFileRequest {
+  string sandbox_id = 1;
+  string path = 2;
+  bytes content = 3;
+}
+
+message ReadFileRequest {
+  string sandbox_id = 1;
+  string path = 2;
+}
+
+message FileContent {
+  bytes content = 1;
+}
+
+message ListFilesRequest {
+  string sandbox_id = 1;
+  string directory = 2;
+}
+
+message FileInfo {
+  string name = 1;
+  string path = 2;
+  bool is_directory = 3;
+  int64 size = 4;
+  int64 modified_at = 5;
+}
+
+message ListFilesResponse {
+  repeated FileInfo files = 1;
+}
+
+message ExportResponse {
+  repeated ExportedFile files = 1;
+  Sandbox sandbox = 2;
+}
+
+message ExportedFile {
+  string path = 1;
+  bytes content = 2;
+}
+
+message SandboxEvent {
+  string type = 1;
+  string sandbox_id = 2;
+  int64 timestamp = 3;
+  bytes payload = 4;
+}

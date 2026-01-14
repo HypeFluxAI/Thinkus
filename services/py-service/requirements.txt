@@ -1,0 +1,35 @@
+# Web Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# gRPC
+grpcio==1.68.1
+grpcio-tools==1.68.1
+protobuf==5.29.2
+
+# Database
+pymongo==4.10.1
+motor==3.6.0
+redis==5.2.1
+
+# AI
+anthropic==0.42.0
+openai==1.58.1
+pinecone-client==5.0.1
+
+# Document Processing
+pypdf2==3.0.1
+python-docx==1.1.2
+openpyxl==3.1.5
+Pillow==11.0.0
+httpx==0.28.1
+beautifulsoup4==4.12.3
+
+# Utils
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.2

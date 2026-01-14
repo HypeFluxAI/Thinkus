@@ -2,8 +2,12 @@ import Anthropic from '@anthropic-ai/sdk'
 import { EXECUTIVES, type AgentId } from '@/lib/config/executives'
 import { type IUserExecutive } from '@/lib/db/models/user-executive'
 import { buildExecutiveSystemPrompt } from './executive-prompt'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -176,15 +180,28 @@ export async function generateAgentResponse(params: {
   })
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 512,
-      temperature: 0.8,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
+    let content = ''
 
-    return response.content[0].type === 'text' ? response.content[0].text : ''
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: systemPrompt,
+        max_tokens: 512,
+        temperature: 0.8,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 512,
+        temperature: 0.8,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
+
+    return content
   } catch (error) {
     console.error(`Failed to generate response for ${agentId}:`, error)
     throw error
@@ -221,17 +238,32 @@ export async function* generateAgentResponseStream(params: {
     stage,
   })
 
-  const stream = await anthropic.messages.stream({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 512,
-    temperature: 0.8,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }],
-  })
+  if (useGemini) {
+    const generator = gemini.streamMessage({
+      system: systemPrompt,
+      max_tokens: 512,
+      temperature: 0.8,
+      messages: [{ role: 'user', content: userPrompt }],
+    })
 
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      yield event.delta.text
+    for await (const event of generator) {
+      if (event.type === 'content_block_delta' && event.delta?.text) {
+        yield event.delta.text
+      }
+    }
+  } else {
+    const stream = await anthropic!.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 512,
+      temperature: 0.8,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    })
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        yield event.delta.text
+      }
     }
   }
 }
@@ -332,15 +364,26 @@ ${messagesText}
 请生成结构化的讨论总结。`
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      temperature: 0.3,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
+    let content = ''
 
-    const content = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: systemPrompt,
+        max_tokens: 1024,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        temperature: 0.3,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
 
     // 提取JSON
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)

@@ -165,7 +165,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         return (
           <Button onClick={() => router.push('/create')}>
             <FileText className="h-4 w-4 mr-2" />
-            继续编辑
+            继续创建
           </Button>
         )
       case 'pending_payment':

@@ -5,8 +5,12 @@ import { UserExecutive, Memory, type IDiscussion } from '@/lib/db/models'
 import { storeMemory } from '@/lib/vector/memory-service'
 import { generateNamespace } from '@/lib/vector/pinecone'
 import type { CommunicationStyle, DecisionStyle } from '@/lib/db/models/user-executive'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -88,15 +92,26 @@ ${messagesText}
 请分析以上对话，提取用户偏好。`
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 512,
-      temperature: 0.3,
-      system: PREFERENCE_EXTRACTION_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
+    let content = ''
 
-    const content = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: PREFERENCE_EXTRACTION_PROMPT,
+        max_tokens: 512,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 512,
+        temperature: 0.3,
+        system: PREFERENCE_EXTRACTION_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
 
     // 提取JSON
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)

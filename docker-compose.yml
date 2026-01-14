@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # Next.js 主服务
+  app:
+    build:
+      context: ./thinkus-app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+      # gRPC 服务地址
+      - GRPC_PY_SERVICE_URL=py-service:50051
+      - GRPC_ANALYTICS_URL=go-analytics:50052
+      - GRPC_SANDBOX_URL=go-sandbox:50053
+    depends_on:
+      - py-service
+      - go-analytics
+      - go-sandbox
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Python 微服务 (文档处理、AI分析)
+  py-service:
+    build:
+      context: ./services/py-service
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
+      - GRPC_PORT=50051
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import grpc; exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Go Analytics 微服务 (数据分析、实时流)
+  go-analytics:
+    build:
+      context: ./services/go-analytics
+      dockerfile: Dockerfile
+    ports:
+      - "50052:50052"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - REDIS_URL=redis://redis:6379
+      - GRPC_PORT=50052
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/app/server", "-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Go Sandbox 微服务 (容器管理)
+  go-sandbox:
+    build:
+      context: ./services/go-sandbox
+      dockerfile: Dockerfile
+    ports:
+      - "50053:50053"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - REDIS_URL=redis://redis:6379
+      - GRPC_PORT=50053
+      - DATA_DIR=/data/sandboxes
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox-data:/data/sandboxes
+    restart: unless-stopped
+    privileged: true
+
+  # Redis (缓存和消息队列)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis-data:
+  sandbox-data:
+
+networks:
+  default:
+    name: thinkus-network

@@ -1,8 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { EXECUTIVES, EXECUTIVES_BY_GROUP, type AgentId, type AgentGroup } from '@/lib/config/executives'
 import { PROJECT_PHASES, type ProjectPhase } from '@/lib/config/project-phases'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -79,15 +83,26 @@ export async function analyzeTopicWithAI(params: {
   }
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 512,
-      temperature: 0.3,
-      system: TOPIC_ANALYSIS_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
+    let content = ''
 
-    const content = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: TOPIC_ANALYSIS_PROMPT,
+        max_tokens: 512,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 512,
+        temperature: 0.3,
+        system: TOPIC_ANALYSIS_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
 
     // 提取JSON
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)

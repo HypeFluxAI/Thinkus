@@ -1,6 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { type AgentId } from '@/lib/config/executives'
 import { type MemoryType } from '@/lib/vector/pinecone'
+import * as gemini from '@/lib/ai/gemini'
+
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
 
 /**
  * 记忆控制器输入
@@ -59,7 +63,7 @@ export interface RetrievalResult {
 }
 
 // Anthropic 客户端
-const anthropic = new Anthropic({
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -84,14 +88,23 @@ export class MemoryControllerService {
     try {
       const prompt = this.buildPrompt(userMessage, projectId, agentId, messageCount, recentContext)
 
-      const response = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-20241022',  // 用便宜的模型做判断
-        max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      let text = ''
 
-      const textBlock = response.content.find(block => block.type === 'text')
-      const text = textBlock?.text || ''
+      if (useGemini) {
+        const response = await gemini.createMessage({
+          max_tokens: 200,
+          messages: [{ role: 'user', content: prompt }]
+        })
+        text = response.content[0]?.text || ''
+      } else {
+        const response = await anthropic!.messages.create({
+          model: 'claude-3-5-haiku-20241022',  // 用便宜的模型做判断
+          max_tokens: 200,
+          messages: [{ role: 'user', content: prompt }]
+        })
+        const textBlock = response.content.find(block => block.type === 'text')
+        text = textBlock?.text || ''
+      }
 
       return this.parseResponse(text)
     } catch (error) {

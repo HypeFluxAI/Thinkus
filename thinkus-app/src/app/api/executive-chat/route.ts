@@ -8,8 +8,12 @@ import { EXECUTIVES, type AgentId } from '@/lib/config/executives'
 import { buildExecutiveSystemPrompt } from '@/lib/services/executive-prompt'
 import { enhanceConversationContext } from '@/lib/services/memory-injector'
 import dbConnect from '@/lib/db/connection'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -122,22 +126,43 @@ export async function POST(req: NextRequest) {
           let fullContent = ''
 
           // 创建流式响应
-          const stream = await anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 2048,
-            temperature: 0.7,
-            system: systemPrompt,
-            messages: messages.map(m => ({
-              role: m.role,
-              content: m.content,
-            })),
-          })
+          if (useGemini) {
+            // 使用 Gemini
+            const generator = gemini.streamMessage({
+              system: systemPrompt,
+              max_tokens: 2048,
+              temperature: 0.7,
+              messages: messages.map(m => ({
+                role: m.role,
+                content: m.content,
+              })),
+            })
 
-          // 流式输出
-          for await (const event of stream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              fullContent += event.delta.text
-              sendEvent('delta', { content: event.delta.text })
+            for await (const event of generator) {
+              if (event.type === 'content_block_delta' && event.delta?.text) {
+                fullContent += event.delta.text
+                sendEvent('delta', { content: event.delta.text })
+              }
+            }
+          } else {
+            // 使用 Anthropic
+            const stream = await anthropic!.messages.stream({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 2048,
+              temperature: 0.7,
+              system: systemPrompt,
+              messages: messages.map(m => ({
+                role: m.role,
+                content: m.content,
+              })),
+            })
+
+            // 流式输出
+            for await (const event of stream) {
+              if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                fullContent += event.delta.text
+                sendEvent('delta', { content: event.delta.text })
+              }
             }
           }
 

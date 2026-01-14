@@ -18,7 +18,7 @@ import {
   getOrchestratorPrompt,
 } from '@/lib/ai/experts/prompts'
 import * as gemini from '@/lib/ai/gemini'
-import { calculateProjectPrice } from '@/lib/stripe/config'
+import { calculateProjectPrice } from '@/lib/pricing/calculator'
 
 // 检查使用哪个 AI 服务
 const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY

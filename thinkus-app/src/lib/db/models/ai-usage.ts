@@ -10,6 +10,13 @@ export type AIModel =
   | 'gpt-3.5-turbo'
   | 'text-embedding-3-small'
   | 'text-embedding-3-large'
+  | 'gemini-3-pro-preview'
+  | 'gemini-3-flash-preview'
+  | 'gemini-2.5-pro'
+  | 'gemini-2.5-flash'
+  | 'gemini-2.5-flash-lite'
+  | 'gemini-2.0-flash'
+  | 'gemini-2.0-flash-lite'
 
 // 使用类型
 export type UsageType =
@@ -73,6 +80,16 @@ export const MODEL_PRICING: Record<AIModel, { input: number; output: number }> =
   'gpt-3.5-turbo': { input: 0.5, output: 1.5 },
   'text-embedding-3-small': { input: 0.02, output: 0 },
   'text-embedding-3-large': { input: 0.13, output: 0 },
+  // Gemini 3.0 models (preview)
+  'gemini-3-pro-preview': { input: 1.5, output: 6.0 },
+  'gemini-3-flash-preview': { input: 0.10, output: 0.40 },
+  // Gemini 2.5 models
+  'gemini-2.5-pro': { input: 1.25, output: 5.0 },
+  'gemini-2.5-flash': { input: 0.075, output: 0.30 },
+  'gemini-2.5-flash-lite': { input: 0.0375, output: 0.15 },
+  // Gemini 2.0 models
+  'gemini-2.0-flash': { input: 0.075, output: 0.30 },
+  'gemini-2.0-flash-lite': { input: 0.0375, output: 0.15 },
 }
 
 // 模型接口
@@ -127,6 +144,13 @@ const AIUsageSchema = new Schema<IAIUsage>(
         'gpt-3.5-turbo',
         'text-embedding-3-small',
         'text-embedding-3-large',
+        'gemini-3-pro-preview',
+        'gemini-3-flash-preview',
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-lite',
       ],
       required: true,
     },

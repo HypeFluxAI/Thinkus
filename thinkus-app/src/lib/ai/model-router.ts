@@ -1,4 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
+import * as gemini from './gemini'
+
+// 检查是否使用 Gemini
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
 
 /**
  * 模型配置
@@ -155,8 +159,8 @@ const TASK_MODEL_RULES: Record<TaskType, {
   },
 }
 
-// Anthropic 客户端
-const anthropic = new Anthropic({
+// Anthropic 客户端 (仅在有 API Key 时初始化)
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -249,21 +253,31 @@ export class ModelRouterService {
       return 'complex'
     }
 
-    // 使用 Haiku 快速评估
+    // 使用 AI 快速评估
     try {
-      const response = await anthropic.messages.create({
-        model: MODEL_CONFIG['claude-haiku'].id,
-        max_tokens: 10,
-        messages: [{
-          role: 'user',
-          content: `评估任务复杂度，只返回 simple/medium/complex 中的一个:
+      const prompt = `评估任务复杂度，只返回 simple/medium/complex 中的一个:
 任务: ${context.description.slice(0, 200)}
 ${context.estimatedLines ? `代码量: ${context.estimatedLines}行` : ''}`
-        }]
-      })
 
-      const textBlock = response.content.find(block => block.type === 'text')
-      const result = textBlock?.text?.trim().toLowerCase()
+      let result: string | undefined
+
+      if (useGemini) {
+        // 使用 Gemini
+        const response = await gemini.createMessage({
+          max_tokens: 10,
+          messages: [{ role: 'user', content: prompt }]
+        })
+        result = response.content[0]?.text?.trim().toLowerCase()
+      } else {
+        // 使用 Anthropic
+        const response = await anthropic!.messages.create({
+          model: MODEL_CONFIG['claude-haiku'].id,
+          max_tokens: 10,
+          messages: [{ role: 'user', content: prompt }]
+        })
+        const textBlock = response.content.find(block => block.type === 'text')
+        result = textBlock?.text?.trim().toLowerCase()
+      }
 
       if (result === 'simple' || result === 'medium' || result === 'complex') {
         return result

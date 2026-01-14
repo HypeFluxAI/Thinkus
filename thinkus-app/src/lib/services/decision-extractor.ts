@@ -3,8 +3,12 @@ import mongoose from 'mongoose'
 import { type AgentId, EXECUTIVES } from '@/lib/config/executives'
 import { Decision, ActionItem, type IDiscussion } from '@/lib/db/models'
 import type { DecisionType, DecisionImportance } from '@/lib/db/models'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -132,15 +136,26 @@ ${discussion.conclusions?.length ? `## 结论\n${discussion.conclusions.join('\n
 请提取所有决策和行动项。`
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 2048,
-      temperature: 0.3,
-      system: DECISION_EXTRACTION_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
+    let content = ''
 
-    const content = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: DECISION_EXTRACTION_PROMPT,
+        max_tokens: 2048,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 2048,
+        temperature: 0.3,
+        system: DECISION_EXTRACTION_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
 
     // 提取JSON
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)

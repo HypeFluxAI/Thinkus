@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # Next.js 主服务 (开发模式)
+  app:
+    build:
+      context: ./thinkus-app
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./thinkus-app:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - GRPC_PY_SERVICE_URL=py-service:50051
+      - GRPC_ANALYTICS_URL=go-analytics:50052
+      - GRPC_SANDBOX_URL=go-sandbox:50053
+    depends_on:
+      - py-service
+      - go-analytics
+      - go-sandbox
+      - redis
+    command: pnpm dev
+
+  # Python 微服务 (开发模式)
+  py-service:
+    build:
+      context: ./services/py-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "50051:50051"
+      - "8000:8000"
+    volumes:
+      - ./services/py-service/src:/app/src
+      - ./services/proto:/app/proto
+    environment:
+      - GRPC_PORT=50051
+    command: >
+      sh -c "python -m grpc_tools.protoc -I./proto --python_out=./src/proto --grpc_python_out=./src/proto ./proto/*.proto &&
+             uvicorn src.main:app --reload --host 0.0.0.0 --port 8000"
+
+  # Go Analytics 微服务 (开发模式)
+  go-analytics:
+    build:
+      context: ./services/go-analytics
+      dockerfile: Dockerfile.dev
+    ports:
+      - "50052:50052"
+    volumes:
+      - ./services/go-analytics:/app
+      - ./services/proto:/app/proto
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GRPC_PORT=50052
+    depends_on:
+      - redis
+    command: air -c .air.toml
+
+  # Go Sandbox 微服务 (开发模式)
+  go-sandbox:
+    build:
+      context: ./services/go-sandbox
+      dockerfile: Dockerfile.dev
+    ports:
+      - "50053:50053"
+    volumes:
+      - ./services/go-sandbox:/app
+      - ./services/proto:/app/proto
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox-data:/data/sandboxes
+    environment:
+      - GRPC_PORT=50053
+      - DATA_DIR=/data/sandboxes
+    privileged: true
+    command: air -c .air.toml
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis-data:
+  sandbox-data:
+
+networks:
+  default:
+    name: thinkus-dev-network

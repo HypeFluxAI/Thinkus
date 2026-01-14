@@ -1,6 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
+import * as gemini from './gemini'
 
-const anthropic = new Anthropic({
+// 检查是否配置了 Anthropic API Key
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -23,7 +27,18 @@ export interface ChatResponse {
 }
 
 export async function chat(options: ChatOptions): Promise<ChatResponse> {
-  const response = await anthropic.messages.create({
+  // 使用 Gemini 作为后备
+  if (useGemini) {
+    return gemini.chat({
+      model: options.model,
+      system: options.system,
+      messages: options.messages,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+    })
+  }
+
+  const response = await anthropic!.messages.create({
     model: options.model || 'claude-sonnet-4-20250514',
     max_tokens: options.maxTokens || 2000,
     temperature: options.temperature || 0.7,
@@ -51,7 +66,20 @@ export interface StreamChatOptions {
 }
 
 export async function streamChat(options: StreamChatOptions): Promise<void> {
-  const stream = await anthropic.messages.stream({
+  // 使用 Gemini 作为后备
+  if (useGemini) {
+    return gemini.streamChat({
+      model: options.model,
+      system: options.system,
+      messages: options.messages,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      onChunk: options.onChunk,
+      onComplete: options.onComplete,
+    })
+  }
+
+  const stream = await anthropic!.messages.stream({
     model: options.model || 'claude-sonnet-4-20250514',
     max_tokens: options.maxTokens || 2000,
     temperature: options.temperature || 0.7,

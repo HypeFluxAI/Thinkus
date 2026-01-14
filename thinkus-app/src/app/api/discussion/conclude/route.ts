@@ -8,8 +8,12 @@ import { EXECUTIVES, type AgentId } from '@/lib/config/executives'
 import { extractAndStoreInsights, extractDecisionsFromDiscussion as extractDecisionsToMemory } from '@/lib/services/preference-extractor'
 import { extractDecisionsFromDiscussion } from '@/lib/services/decision-extractor'
 import dbConnect from '@/lib/db/connection'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -219,15 +223,26 @@ ${messagesText}
 请分析以上讨论内容，生成结构化的总结。`
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      temperature: 0.3,
-      system: CONCLUSION_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
+    let content = ''
 
-    const content = response.content[0].type === 'text' ? response.content[0].text : ''
+    if (useGemini) {
+      const response = await gemini.createMessage({
+        system: CONCLUSION_SYSTEM_PROMPT,
+        max_tokens: 1024,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0]?.text || ''
+    } else {
+      const response = await anthropic!.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        temperature: 0.3,
+        system: CONCLUSION_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      content = response.content[0].type === 'text' ? response.content[0].text : ''
+    }
 
     // 提取JSON
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)

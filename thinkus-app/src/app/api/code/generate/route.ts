@@ -4,8 +4,12 @@ import { authOptions } from '@/lib/auth'
 import { connectDB } from '@/lib/db/connect'
 import { Project, AIUsage } from '@/lib/db/models'
 import Anthropic from '@anthropic-ai/sdk'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic()
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic()
 
 /**
  * POST /api/code/generate
@@ -88,32 +92,53 @@ ${isUtil ? 'This is a utility/lib file. Focus on reusability and proper exports.
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 4096,
-            stream: true,
-            system: systemPrompt,
-            messages: [
-              { role: 'user', content: userPrompt },
-            ],
-          })
+          if (useGemini) {
+            // 使用 Gemini
+            const generator = gemini.streamMessage({
+              system: systemPrompt,
+              max_tokens: 4096,
+              messages: [{ role: 'user', content: userPrompt }],
+            })
 
-          for await (const event of response) {
-            if (event.type === 'content_block_delta') {
-              const delta = event.delta as { type: string; text?: string }
-              if (delta.type === 'text_delta' && delta.text) {
-                const data = JSON.stringify({ content: delta.text })
+            let outputLength = 0
+            for await (const event of generator) {
+              if (event.type === 'content_block_delta' && event.delta?.text) {
+                outputLength += event.delta.text.length
+                const data = JSON.stringify({ content: event.delta.text })
                 controller.enqueue(encoder.encode(`data: ${data}\n\n`))
               }
-            } else if (event.type === 'message_delta') {
-              const usage = (event as { usage?: { output_tokens: number } }).usage
-              if (usage) {
-                totalOutputTokens = usage.output_tokens
-              }
-            } else if (event.type === 'message_start') {
-              const message = (event as { message?: { usage?: { input_tokens: number } } }).message
-              if (message?.usage) {
-                totalInputTokens = message.usage.input_tokens
+            }
+            totalOutputTokens = Math.ceil(outputLength / 4)
+            totalInputTokens = Math.ceil((systemPrompt.length + userPrompt.length) / 4)
+          } else {
+            // 使用 Anthropic
+            const response = await anthropic!.messages.create({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 4096,
+              stream: true,
+              system: systemPrompt,
+              messages: [
+                { role: 'user', content: userPrompt },
+              ],
+            })
+
+            for await (const event of response) {
+              if (event.type === 'content_block_delta') {
+                const delta = event.delta as { type: string; text?: string }
+                if (delta.type === 'text_delta' && delta.text) {
+                  const data = JSON.stringify({ content: delta.text })
+                  controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+                }
+              } else if (event.type === 'message_delta') {
+                const usage = (event as { usage?: { output_tokens: number } }).usage
+                if (usage) {
+                  totalOutputTokens = usage.output_tokens
+                }
+              } else if (event.type === 'message_start') {
+                const message = (event as { message?: { usage?: { input_tokens: number } } }).message
+                if (message?.usage) {
+                  totalInputTokens = message.usage.input_tokens
+                }
               }
             }
           }
@@ -123,7 +148,7 @@ ${isUtil ? 'This is a utility/lib file. Focus on reusability and proper exports.
             await AIUsage.recordUsage({
               userId: session.user.id as any,
               projectId: projectId,
-              aiModel: 'claude-sonnet-4',
+              aiModel: useGemini ? 'gemini-2.0-flash' : 'claude-sonnet-4',
               usageType: 'code_generation',
               inputTokens: totalInputTokens,
               outputTokens: totalOutputTokens,

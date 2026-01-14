@@ -1,0 +1,171 @@
+syntax = "proto3";
+
+package thinkus.document;
+
+import "common.proto";
+
+option go_package = "github.com/thinkus/services/pkg/proto/document";
+
+// 文档处理服务
+service DocumentService {
+  // 处理上传的文件
+  rpc ProcessFiles(ProcessFilesRequest) returns (ProcessFilesResponse);
+
+  // 处理 URL
+  rpc ProcessURL(ProcessURLRequest) returns (ProcessedResult);
+
+  // 整合需求
+  rpc IntegrateRequirements(IntegrateRequest) returns (IntegratedRequirement);
+
+  // 生成增长建议
+  rpc GenerateGrowthAdvice(GrowthAdviceRequest) returns (GrowthAdviceResponse);
+
+  // 匹配经验
+  rpc MatchExperience(ExperienceMatchRequest) returns (ExperienceMatchResponse);
+
+  // 添加经验
+  rpc AddExperience(AddExperienceRequest) returns (Experience);
+}
+
+message UploadedFile {
+  string name = 1;
+  bytes content = 2;
+  string mime_type = 3;
+}
+
+message ProcessFilesRequest {
+  repeated UploadedFile files = 1;
+  string user_id = 2;
+}
+
+message ProcessedResult {
+  string file_name = 1;
+  string file_type = 2;
+  string raw_content = 3;
+  StructuredContent structured = 4;
+  string error = 5;
+}
+
+message StructuredContent {
+  string content_type = 1;
+  string summary = 2;
+  repeated FeatureItem features = 3;
+  repeated UIElement ui_elements = 4;
+  repeated DataField data_fields = 5;
+  repeated Reference references = 6;
+}
+
+message FeatureItem {
+  string name = 1;
+  string description = 2;
+  string priority = 3;
+  repeated string tags = 4;
+}
+
+message UIElement {
+  string name = 1;
+  string type = 2;
+  string description = 3;
+}
+
+message DataField {
+  string name = 1;
+  string type = 2;
+  string description = 3;
+  bool required = 4;
+}
+
+message Reference {
+  string type = 1;
+  string url = 2;
+  string description = 3;
+}
+
+message ProcessFilesResponse {
+  repeated ProcessedResult results = 1;
+}
+
+message ProcessURLRequest {
+  string url = 1;
+  string user_id = 2;
+}
+
+message IntegrateRequest {
+  repeated ProcessedResult documents = 1;
+  string existing_requirement = 2;
+  bool use_ai = 3;
+}
+
+message IntegratedRequirement {
+  string summary = 1;
+  repeated FeatureItem features = 2;
+  repeated string tech_suggestions = 3;
+  repeated string risks = 4;
+  repeated string sources = 5;
+}
+
+message GrowthAdviceRequest {
+  string project_id = 1;
+  string category = 2;
+  bool force_refresh = 3;
+}
+
+message GrowthAdvice {
+  string id = 1;
+  string type = 2;
+  string priority = 3;
+  string problem = 4;
+  string suggestion = 5;
+  string expected_impact = 6;
+  repeated string metrics = 7;
+  Implementation implementation = 8;
+}
+
+message Implementation {
+  string type = 1;
+  int32 estimated_cost = 2;
+  string estimated_time = 3;
+  string difficulty = 4;
+}
+
+message GrowthAdviceResponse {
+  repeated GrowthAdvice advices = 1;
+}
+
+message ExperienceMatchRequest {
+  string query = 1;
+  string category = 2;
+  string complexity = 3;
+  int32 limit = 4;
+}
+
+message Experience {
+  string id = 1;
+  string type = 2;
+  string category = 3;
+  string title = 4;
+  string description = 5;
+  string complexity = 6;
+  float relevance_score = 7;
+}
+
+message ExperienceMatchResponse {
+  repeated Experience experiences = 1;
+}
+
+message AddExperienceRequest {
+  string user_id = 1;
+  string project_id = 2;
+  string type = 3;
+  string category = 4;
+  string title = 5;
+  string description = 6;
+  string content = 7;
+  repeated CodeFile code_files = 8;
+}
+
+message CodeFile {
+  string path = 1;
+  string language = 2;
+  string content = 3;
+}

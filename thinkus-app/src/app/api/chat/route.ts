@@ -2,8 +2,12 @@ import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/options'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -50,27 +54,47 @@ export async function POST(req: NextRequest) {
       return new Response('Invalid messages', { status: 400 })
     }
 
-    const stream = await anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: messages.map((m: { role: string; content: string }) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })),
-    })
+    const formattedMessages = messages.map((m: { role: string; content: string }) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }))
 
     const encoder = new TextEncoder()
 
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of stream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              const data = JSON.stringify({ type: 'text', content: event.delta.text })
-              controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+          if (useGemini) {
+            // 使用 Gemini
+            const generator = gemini.streamMessage({
+              system: SYSTEM_PROMPT,
+              max_tokens: 1024,
+              messages: formattedMessages,
+            })
+
+            for await (const event of generator) {
+              if (event.type === 'content_block_delta' && event.delta?.text) {
+                const data = JSON.stringify({ type: 'text', content: event.delta.text })
+                controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+              }
+            }
+          } else {
+            // 使用 Anthropic
+            const stream = await anthropic!.messages.stream({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 1024,
+              system: SYSTEM_PROMPT,
+              messages: formattedMessages,
+            })
+
+            for await (const event of stream) {
+              if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                const data = JSON.stringify({ type: 'text', content: event.delta.text })
+                controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+              }
             }
           }
+
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
           controller.close()
         } catch (error) {

@@ -23,18 +23,38 @@
   - Zustand (状态管理)
   - TanStack Query + tRPC
 
-后端:
-  - tRPC
+后端 (微服务架构):
+  主服务 (Node.js):
+    - tRPC API路由
+    - NextAuth认证
+    - Memory/Executive服务
+
+  Python微服务 (FastAPI + gRPC):
+    - DocumentProcessor (文档处理)
+    - RequirementIntegrator (需求整合)
+    - GrowthAdvisor (增长建议)
+    - ExperienceService (经验库)
+
+  Go Analytics微服务 (Gin + gRPC):
+    - AnalyticsService (数据分析)
+    - RealtimeStream (实时推送)
+
+  Go Sandbox微服务 (Gin + gRPC):
+    - SandboxManager (容器管理)
+
+数据存储:
   - MongoDB (Mongoose)
-  - Redis (缓存)
-  - BullMQ (队列)
+  - Redis (缓存+消息)
+  - Pinecone (向量搜索)
 
 AI:
   - Anthropic Claude API
   - Model: Claude Opus/Sonnet/Haiku
+  - OpenAI Embeddings
 
 部署:
-  - Vercel
+  - Docker Compose (微服务编排)
+  - Vercel (前端)
   - MongoDB Atlas
   - Cloudflare (CDN)
 ```

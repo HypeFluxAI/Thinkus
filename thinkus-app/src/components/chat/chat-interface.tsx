@@ -39,6 +39,96 @@ function formatRelativeTime(date?: Date | string): string {
   return formatTime(d)
 }
 
+// Markdown 渲染函数
+function renderMarkdown(text: string): React.ReactNode {
+  if (!text) return null
+
+  const paragraphs = text.split(/\n\n+/)
+
+  return paragraphs.map((paragraph, pIndex) => {
+    // 处理无序列表
+    if (paragraph.match(/^[\s]*[-*]\s/m)) {
+      const listItems = paragraph.split(/\n/).filter(line => line.trim())
+      return (
+        <ul key={pIndex} className="list-disc list-inside space-y-1 my-2">
+          {listItems.map((item, iIndex) => {
+            const content = item.replace(/^[\s]*[-*]\s+/, '')
+            return <li key={iIndex}>{renderInlineMarkdown(content)}</li>
+          })}
+        </ul>
+      )
+    }
+
+    // 处理数字列表
+    if (paragraph.match(/^[\s]*\d+\.\s/m)) {
+      const listItems = paragraph.split(/\n/).filter(line => line.trim())
+      return (
+        <ol key={pIndex} className="list-decimal list-inside space-y-1 my-2">
+          {listItems.map((item, iIndex) => {
+            const content = item.replace(/^[\s]*\d+\.\s+/, '')
+            return <li key={iIndex}>{renderInlineMarkdown(content)}</li>
+          })}
+        </ol>
+      )
+    }
+
+    // 普通段落
+    return (
+      <p key={pIndex} className="my-1">
+        {renderInlineMarkdown(paragraph)}
+      </p>
+    )
+  })
+}
+
+// 渲染行内 Markdown
+function renderInlineMarkdown(text: string): React.ReactNode {
+  if (!text) return null
+
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let key = 0
+
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g
+  let match
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+
+    const matchedText = match[0]
+
+    if (matchedText.startsWith('**') && matchedText.endsWith('**')) {
+      parts.push(
+        <strong key={key++} className="font-semibold">
+          {matchedText.slice(2, -2)}
+        </strong>
+      )
+    } else if (matchedText.startsWith('*') && matchedText.endsWith('*')) {
+      parts.push(
+        <em key={key++} className="italic">
+          {matchedText.slice(1, -1)}
+        </em>
+      )
+    } else if (matchedText.startsWith('`') && matchedText.endsWith('`')) {
+      parts.push(
+        <code key={key++} className="bg-background/50 px-1 py-0.5 rounded text-xs font-mono">
+          {matchedText.slice(1, -1)}
+        </code>
+      )
+    }
+
+    lastIndex = regex.lastIndex
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+
+  return parts.length > 0 ? parts : text
+}
+
 interface ChatInterfaceProps {
   messages: Message[]
   onSendMessage: (message: string) => Promise<void>
@@ -137,7 +227,9 @@ export function ChatInterface({
                     {message.speaker}
                   </div>
                 )}
-                <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words [&>p]:my-1 [&>ul]:my-2 [&>ol]:my-2">
+                  {message.role === 'assistant' ? renderMarkdown(message.content) : message.content}
+                </div>
                 {message.isStreaming && (
                   <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1" />
                 )}

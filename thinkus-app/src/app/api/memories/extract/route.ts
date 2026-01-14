@@ -7,8 +7,12 @@ import Anthropic from '@anthropic-ai/sdk'
 import { storeMemories } from '@/lib/vector/memory-service'
 import type { MemoryType } from '@/lib/vector/pinecone'
 import type { AgentId } from '@/lib/config/executives'
+import * as gemini from '@/lib/ai/gemini'
 
-const anthropic = new Anthropic({
+// 检查使用哪个 AI 服务
+const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
+
+const anthropic = useGemini ? null : new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
@@ -140,13 +144,7 @@ async function extractMemoryPoints(discussion: any): Promise<MemoryPoint[]> {
     .map((m: any) => `[${m.agentId || 'user'}]: ${m.content}`)
     .join('\n')
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 2000,
-    messages: [
-      {
-        role: 'user',
-        content: `分析以下讨论，提取值得记忆的要点。
+  const userPrompt = `分析以下讨论，提取值得记忆的要点。
 
 讨论主题：${discussion.topic || '未指定'}
 参与者：${(discussion.participants || []).join(', ')}
@@ -175,12 +173,24 @@ ${messagesText}
 返回格式：
 \`\`\`json
 [...]
-\`\`\``,
-      },
-    ],
-  })
+\`\`\``
 
-  const content = response.content[0].type === 'text' ? response.content[0].text : ''
+  let content = ''
+
+  if (useGemini) {
+    const response = await gemini.createMessage({
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: userPrompt }],
+    })
+    content = response.content[0]?.text || ''
+  } else {
+    const response = await anthropic!.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: userPrompt }],
+    })
+    content = response.content[0].type === 'text' ? response.content[0].text : ''
+  }
   const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)
 
   if (jsonMatch) {

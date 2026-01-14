@@ -1,0 +1,191 @@
+syntax = "proto3";
+
+package thinkus.analytics;
+
+import "common.proto";
+
+option go_package = "github.com/thinkus/services/pkg/proto/analytics";
+
+// 分析服务
+service AnalyticsService {
+  // 记录事件
+  rpc Track(TrackRequest) returns (TrackResponse);
+
+  // 批量记录事件
+  rpc TrackBatch(TrackBatchRequest) returns (thinkus.Empty);
+
+  // 获取项目统计
+  rpc GetStats(GetStatsRequest) returns (ProjectStats);
+
+  // 获取趋势数据
+  rpc GetTrends(GetTrendsRequest) returns (TrendResponse);
+
+  // 获取转化漏斗
+  rpc GetFunnel(GetFunnelRequest) returns (FunnelResponse);
+
+  // 获取热门页面
+  rpc GetTopPages(GetTopPagesRequest) returns (TopPagesResponse);
+
+  // 生成跟踪脚本
+  rpc GenerateTrackingScript(ScriptRequest) returns (ScriptResponse);
+}
+
+// 实时流服务
+service RealtimeService {
+  // 订阅项目事件流
+  rpc Subscribe(SubscribeRequest) returns (stream StreamEvent);
+
+  // 推送事件
+  rpc Push(PushEventRequest) returns (thinkus.Empty);
+}
+
+message TrackRequest {
+  string project_id = 1;
+  string event = 2;
+  string session_id = 3;
+  string url = 4;
+  string referrer = 5;
+  string user_id = 6;
+  map<string, string> data = 7;
+  Device device = 8;
+  Geo geo = 9;
+}
+
+message Device {
+  string type = 1;
+  string os = 2;
+  string browser = 3;
+}
+
+message Geo {
+  string country = 1;
+  string city = 2;
+  string timezone = 3;
+}
+
+message TrackResponse {
+  string event_id = 1;
+}
+
+message TrackBatchRequest {
+  repeated TrackRequest events = 1;
+}
+
+message Period {
+  int64 start = 1;
+  int64 end = 2;
+}
+
+message GetStatsRequest {
+  string project_id = 1;
+  Period period = 2;
+}
+
+message ProjectStats {
+  UserStats users = 1;
+  PageViewStats page_views = 2;
+  SessionStats sessions = 3;
+  ConversionStats conversion = 4;
+  EngagementStats engagement = 5;
+}
+
+message UserStats {
+  int32 total = 1;
+  int32 new = 2;
+  int32 active = 3;
+  float change = 4;
+}
+
+message PageViewStats {
+  int32 total = 1;
+  float change = 2;
+}
+
+message SessionStats {
+  int32 total = 1;
+  int32 avg_duration = 2;
+  float change = 3;
+}
+
+message ConversionStats {
+  float rate = 1;
+  float change = 2;
+}
+
+message EngagementStats {
+  float bounce_rate = 1;
+  int32 avg_session_duration = 2;
+  float page_views_per_session = 3;
+}
+
+message GetTrendsRequest {
+  string project_id = 1;
+  string metric = 2;
+  Period period = 3;
+}
+
+message TrendData {
+  string date = 1;
+  int32 value = 2;
+}
+
+message TrendResponse {
+  repeated TrendData data = 1;
+}
+
+message GetFunnelRequest {
+  string project_id = 1;
+  repeated string steps = 2;
+  Period period = 3;
+}
+
+message FunnelStep {
+  string name = 1;
+  int32 count = 2;
+  float rate = 3;
+  float dropoff = 4;
+}
+
+message FunnelResponse {
+  repeated FunnelStep steps = 1;
+}
+
+message GetTopPagesRequest {
+  string project_id = 1;
+  Period period = 2;
+  int32 limit = 3;
+}
+
+message PageView {
+  string url = 1;
+  int32 views = 2;
+}
+
+message TopPagesResponse {
+  repeated PageView pages = 1;
+}
+
+message ScriptRequest {
+  string project_id = 1;
+}
+
+message ScriptResponse {
+  string script = 1;
+}
+
+message SubscribeRequest {
+  string project_id = 1;
+}
+
+message StreamEvent {
+  string type = 1;
+  string project_id = 2;
+  int64 timestamp = 3;
+  bytes payload = 4;
+}
+
+message PushEventRequest {
+  string project_id = 1;
+  string type = 2;
+  bytes payload = 3;
+}
