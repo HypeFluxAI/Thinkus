@@ -141,6 +141,7 @@ export default function ProjectDiscussPage({ params }: { params: Promise<{ id: s
       : PROJECT_PHASES[phase]?.coreAgents || ['mike', 'david', 'elena'] as AgentId[]
 
     autonomousDiscussion.startDiscussion({
+      projectId,
       topic: topic.trim(),
       description: context.trim() || undefined,
       projectPhase: phase as any,
@@ -550,11 +551,20 @@ export default function ProjectDiscussPage({ params }: { params: Promise<{ id: s
                         停止讨论
                       </Button>
                     )}
-                    {!autonomousDiscussion.isDiscussing && (
-                      <Button variant="outline" size="sm" onClick={handleAutonomousRestart}>
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        重新开始
-                      </Button>
+                    {!autonomousDiscussion.isDiscussing && autonomousDiscussion.messages.length > 0 && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={handleAutonomousRestart}>
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          重新开始
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => router.push(`/projects/${projectId}/decisions`)}
+                        >
+                          查看决策
+                          <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>

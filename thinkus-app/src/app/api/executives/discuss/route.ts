@@ -20,7 +20,10 @@ import {
 } from '@/lib/ai/executives/prompts'
 import * as gemini from '@/lib/ai/gemini'
 import { Project } from '@/lib/db/models/project'
+import { Discussion, type IDiscussion } from '@/lib/db/models/discussion'
+import { Decision } from '@/lib/db/models/decision'
 import { connectDB } from '@/lib/db/connect'
+import mongoose from 'mongoose'
 
 // 检查使用哪个 AI 服务
 const useGemini = !process.env.ANTHROPIC_API_KEY && process.env.GOOGLE_API_KEY
@@ -130,6 +133,38 @@ export async function POST(req: NextRequest) {
             ? Math.max(...existingHistory.map(m => m.round || 1))
             : 0
 
+          // 创建或获取 Discussion 记录
+          let discussion: IDiscussion | null = null
+          if (projectId) {
+            try {
+              // 检查是否有进行中的讨论
+              const existingDiscussion = await Discussion.findOne({
+                projectId: new mongoose.Types.ObjectId(projectId),
+                topic,
+                status: 'active',
+              })
+
+              if (existingDiscussion) {
+                discussion = existingDiscussion
+              } else {
+                // 创建新讨论
+                discussion = await Discussion.create({
+                  projectId: new mongoose.Types.ObjectId(projectId),
+                  userId: new mongoose.Types.ObjectId(session.user.id),
+                  topic,
+                  context: description,
+                  trigger: 'user',
+                  participants: participants,
+                  messages: [],
+                  status: 'active',
+                  currentRound: 0,
+                })
+              }
+            } catch (e) {
+              console.warn('Failed to create/get discussion:', e)
+            }
+          }
+
           // 如果用户发送了新消息
           if (userMessage) {
             currentRound++
@@ -141,6 +176,14 @@ export async function POST(req: NextRequest) {
               timestamp: new Date(),
             })
             sendEvent('user_message', { content: userMessage, round: currentRound })
+
+            // 保存用户消息到数据库
+            if (discussion) {
+              await discussion.addMessage({
+                role: 'user',
+                content: userMessage,
+              })
+            }
           }
 
           // 发送初始状态
@@ -293,16 +336,33 @@ export async function POST(req: NextRequest) {
             }
 
             // 记录消息
+            const agentIdToSave = currentAgent || participants[0]
             discussionHistory.push({
-              agentId: currentAgent || participants[0],
+              agentId: agentIdToSave,
               content: fullContent,
               role: 'executive',
               round,
               timestamp: new Date(),
             })
 
+            // 保存高管消息到数据库
+            if (discussion) {
+              try {
+                await discussion.addMessage({
+                  role: 'agent',
+                  agentId: agentIdToSave,
+                  content: fullContent,
+                })
+                // 更新当前轮次
+                discussion.currentRound = round
+                await discussion.save()
+              } catch (e) {
+                console.warn('Failed to save agent message:', e)
+              }
+            }
+
             sendEvent('expert_message_complete', {
-              agentId: currentAgent || participants[0],
+              agentId: agentIdToSave,
               content: fullContent,
               round,
               tokensUsed,
@@ -379,28 +439,94 @@ export async function POST(req: NextRequest) {
 
           sendEvent('summary_complete', { summary })
 
+          // 保存讨论总结到数据库
+          if (discussion && summary) {
+            try {
+              const conclusions = summary.keyDecisions?.map((d: { decision: string }) => d.decision) || []
+              const actionItems = summary.actionItems?.map((item: { description: string; assignee?: string }) => ({
+                description: item.description,
+                assignee: item.assignee || participants[0],
+                status: 'pending' as const,
+              })) || []
+
+              await discussion.conclude({
+                summary: summary.summary || summaryContent,
+                conclusions,
+                actionItems,
+              })
+            } catch (e) {
+              console.warn('Failed to conclude discussion:', e)
+            }
+          }
+
           // 对讨论结果进行决策分级
-          if (summary?.keyDecisions && summary.keyDecisions.length > 0) {
+          const savedDecisionIds: string[] = []
+          if (summary?.keyDecisions && summary.keyDecisions.length > 0 && projectId) {
             sendEvent('classification_start', {})
 
-            for (const decision of summary.keyDecisions) {
+            for (const decisionItem of summary.keyDecisions) {
               const classification = await classifyDecision(
-                decision.decision,
+                decisionItem.decision,
                 topic,
                 description || ''
               )
 
+              // 保存决策到数据库
+              try {
+                const savedDecision = await Decision.create({
+                  userId: new mongoose.Types.ObjectId(session.user.id),
+                  projectId: new mongoose.Types.ObjectId(projectId),
+                  discussionId: discussion?._id,
+                  title: decisionItem.decision,
+                  description: decisionItem.reasoning || decisionItem.decision,
+                  type: classification.factors?.[0]?.name?.toLowerCase().includes('tech') ? 'technical' :
+                        classification.factors?.[0]?.name?.toLowerCase().includes('design') ? 'design' :
+                        classification.factors?.[0]?.name?.toLowerCase().includes('business') ? 'business' : 'feature',
+                  importance: classification.score > 70 ? 'critical' :
+                             classification.score > 50 ? 'high' :
+                             classification.score > 30 ? 'medium' : 'low',
+                  status: 'proposed',
+                  level: classification.level,
+                  rationale: classification.rationale,
+                  proposedBy: decisionItem.proposedBy || participants[0],
+                  risks: decisionItem.risks || [],
+                })
+                savedDecisionIds.push(savedDecision._id.toString())
+
+                // 将决策ID关联到讨论
+                if (discussion) {
+                  if (!discussion.decisions) {
+                    discussion.decisions = []
+                  }
+                  discussion.decisions.push(savedDecision._id)
+                }
+              } catch (e) {
+                console.warn('Failed to save decision:', e)
+              }
+
               sendEvent('decision_classified', {
-                decision: decision.decision,
+                decision: decisionItem.decision,
                 classification,
               })
             }
 
-            sendEvent('classification_complete', {})
+            // 保存讨论的决策关联
+            if (discussion && savedDecisionIds.length > 0) {
+              try {
+                await discussion.save()
+              } catch (e) {
+                console.warn('Failed to update discussion with decisions:', e)
+              }
+            }
+
+            sendEvent('classification_complete', {
+              savedDecisions: savedDecisionIds.length,
+            })
           }
 
           // 完成讨论
           sendEvent('discussion_complete', {
+            discussionId: discussion?._id?.toString(),
             topic,
             participants,
             totalRounds: round,

@@ -74,6 +74,7 @@ export interface UseAutonomousDiscussionReturn {
 }
 
 export interface StartDiscussionParams {
+  projectId?: string
   topic: string
   description?: string
   projectPhase?: ProjectPhase
@@ -132,6 +133,7 @@ export function useAutonomousDiscussion(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          projectId: params.projectId,
           topic: params.topic,
           description: params.description,
           projectPhase: params.projectPhase || 'development',
@@ -186,6 +188,7 @@ export function useAutonomousDiscussion(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          projectId: discussionParamsRef.current.projectId,
           topic: discussionParamsRef.current.topic,
           description: discussionParamsRef.current.description,
           projectPhase: discussionParamsRef.current.projectPhase || 'development',
