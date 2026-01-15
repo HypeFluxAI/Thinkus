@@ -129,7 +129,7 @@ export function FeaturePanel({ features, isAnalyzing = false }: FeaturePanelProp
                 )}
               </div>
             </div>
-          ))}
+          ))
         )}
       </CardContent>
     </Card>
