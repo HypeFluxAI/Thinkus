@@ -177,3 +177,37 @@ export {
   type GrowthAdvice,
   type GrowthAdviceRecord,
 } from './growth-advisor'
+
+// 错误翻译服务 (小白用户优化)
+export {
+  errorTranslator,
+  ErrorTranslatorService,
+  translateError,
+  shouldAutoRetry,
+  isFatalError,
+  type TranslatedError,
+  type RetryConfig,
+  type ErrorStats,
+} from './error-translator'
+
+// 状态聚合服务 (小白用户优化)
+export {
+  statusAggregator,
+  StatusAggregatorService,
+  type DeploymentInfo,
+  type DatabaseInfo,
+  type DomainInfo,
+  type ApiHealthInfo,
+  type ProjectStatusInput,
+} from './status-aggregator'
+
+// 子域名管理服务 (小白用户优化)
+export {
+  subdomainManager,
+  SubdomainManagerService,
+  type SubdomainRecord,
+  type SubdomainStatus,
+  type SSLStatus,
+  type SubdomainConfigResult,
+  type AvailabilityResult,
+} from './subdomain-manager'
