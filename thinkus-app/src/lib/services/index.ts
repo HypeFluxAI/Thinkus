@@ -245,3 +245,43 @@ export {
   type EmailRecord,
   type DeliveryArchiveInput,
 } from './delivery-archive'
+
+// 构建自动修复服务 (小白用户优化 P2)
+export {
+  buildAutoFixer,
+  BuildAutoFixerService,
+  type BuildErrorType,
+  type BuildError,
+  type FixStrategy,
+  type FixContext,
+  type FixAttempt,
+  type FixResult,
+  type BuildFixReport,
+} from './build-auto-fixer'
+
+// 可视化配置编辑器服务 (小白用户优化 P2)
+export {
+  visualConfigEditor,
+  VisualConfigEditorService,
+  type ConfigType,
+  type FieldType,
+  type ConfigField,
+  type ConfigGroup,
+  type ConfigCategory,
+  type ConfigValues,
+  type ConfigChange,
+  type ValidationResult,
+} from './visual-config-editor'
+
+// 续费提醒服务 (小白用户优化 P2)
+export {
+  renewalReminder,
+  RenewalReminderService,
+  type ServiceType,
+  type ReminderChannel,
+  type ReminderStatus,
+  type ServiceRecord,
+  type ReminderRecord,
+  type ReminderConfig,
+  type RenewalSummary,
+} from './renewal-reminder'
