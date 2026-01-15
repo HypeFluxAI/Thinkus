@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
                 let fullContent = ''
                 let tokensUsed = 0
 
-                const maxTokens = isBrainstorming ? 512 : 256
+                const maxTokens = isBrainstorming ? 1024 : 768
 
                 if (useGemini) {
                   // 使用 Gemini

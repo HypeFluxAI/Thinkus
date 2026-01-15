@@ -307,6 +307,7 @@ R2_REGION=auto
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-15 | 2.2.1 | 修复专家讨论内容截断: 增加max_tokens从256/512到768/1024 |
 | 2026-01-15 | 2.2.0 | 修复流式API错误: chat和discuss API的Controller closed错误、会话数据隔离、E2E测试改进 |
 | 2026-01-13 | 2.1.0 | v12升级Phase 4: 运营闭环 - AnalyticsService数据分析、GrowthAdvisor增长建议 |
 | 2026-01-13 | 2.0.0 | v12升级Phase 3: 沙盒和直播 - SandboxManager容器管理、RealtimeStream实时推送 |
