@@ -130,7 +130,15 @@ export async function POST(req: NextRequest) {
           })
 
           // Process each phase
+          let reachedTargetRounds = false
+
           for (const phaseId of phases) {
+            // Check if we've reached target rounds before starting a new phase
+            if (reachedTargetRounds || currentRound >= targetRounds) {
+              reachedTargetRounds = true
+              break
+            }
+
             const phaseConfig = getPhaseConfig(phaseId)
             const isBrainstorming = phaseId === 'brainstorming'
 
@@ -154,6 +162,7 @@ export async function POST(req: NextRequest) {
                   message: '已达到目标轮数，准备生成方案'
                 })
                 shouldContinuePhase = false
+                reachedTargetRounds = true
                 break
               }
 
