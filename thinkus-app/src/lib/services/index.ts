@@ -211,3 +211,37 @@ export {
   type SubdomainConfigResult,
   type AvailabilityResult,
 } from './subdomain-manager'
+
+// 教程生成服务 (小白用户优化 P1)
+export {
+  tutorialGenerator,
+  TutorialGeneratorService,
+  type TutorialType,
+  type TutorialStep,
+  type Tutorial,
+  type TutorialGenerateOptions,
+} from './tutorial-generator'
+
+// 一键报障服务 (小白用户优化 P1)
+export {
+  issueReporter,
+  IssueReporterService,
+  type IssueType,
+  type DiagnosisResult,
+  type AutoFixSuggestion,
+  type IssueReport,
+  type IssueReportInput,
+  ISSUE_TYPE_CONFIG,
+} from './issue-reporter'
+
+// 交付信息存档服务 (小白用户优化 P1)
+export {
+  deliveryArchive,
+  DeliveryArchiveService,
+  type DeliveryInfo,
+  type AdminCredentials,
+  type DatabaseInfo,
+  type DomainInfo,
+  type EmailRecord,
+  type DeliveryArchiveInput,
+} from './delivery-archive'
