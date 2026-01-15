@@ -304,6 +304,69 @@ export default function DiscussPage() {
                   }
                   break
 
+                case 'feature_consensus':
+                  // Real-time feature consensus updates from expert discussion
+                  if (data.updates && Array.isArray(data.updates)) {
+                    setFeatures(prev => {
+                      const updated = [...prev]
+                      for (const update of data.updates) {
+                        const existingIndex = updated.findIndex(
+                          f => f.name.toLowerCase() === update.featureName.toLowerCase()
+                        )
+
+                        switch (update.action) {
+                          case 'confirmed':
+                            if (existingIndex >= 0) {
+                              updated[existingIndex] = {
+                                ...updated[existingIndex],
+                                status: 'confirmed' as const,
+                                expertNotes: `${data.fromExpert} 确认`,
+                              }
+                            }
+                            break
+                          case 'modified':
+                            if (existingIndex >= 0 && update.newDescription) {
+                              updated[existingIndex] = {
+                                ...updated[existingIndex],
+                                description: update.newDescription,
+                                status: 'modified' as const,
+                                expertNotes: `${data.fromExpert} 建议调整`,
+                              }
+                            }
+                            break
+                          case 'new':
+                            if (existingIndex < 0) {
+                              updated.push({
+                                id: `feat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                                name: update.featureName,
+                                description: update.newDescription || '',
+                                priority: 'medium',
+                                status: 'new' as const,
+                                expertNotes: `${data.fromExpert} 新增建议`,
+                              })
+                            }
+                            break
+                          case 'removed':
+                            if (existingIndex >= 0) {
+                              updated[existingIndex] = {
+                                ...updated[existingIndex],
+                                status: 'removed' as const,
+                                expertNotes: `${data.fromExpert} 建议移除`,
+                              }
+                            }
+                            break
+                        }
+                      }
+                      return updated
+                    })
+                  }
+                  break
+
+                case 'target_rounds_reached':
+                  toast.info(data.message || '已达到目标轮数，准备生成方案')
+                  setCanUserSpeak(false)
+                  break
+
                 case 'phase_converging':
                   toast.info(`讨论收敛: ${data.reason}`)
                   setCanUserSpeak(false)

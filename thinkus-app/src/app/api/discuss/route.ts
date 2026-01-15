@@ -144,19 +144,32 @@ export async function POST(req: NextRequest) {
             let phaseRounds = 0
             let shouldContinuePhase = true
 
-            // Dynamic rounds for brainstorming, fixed for others
+            // Dynamic rounds with total limit check
             while (shouldContinuePhase) {
+              // Check total round limit first
+              if (currentRound >= targetRounds) {
+                sendEvent('target_rounds_reached', {
+                  currentRound,
+                  targetRounds,
+                  message: '已达到目标轮数，准备生成方案'
+                })
+                shouldContinuePhase = false
+                break
+              }
+
               currentRound++
               phaseRounds++
 
               sendEvent('round_start', { round: currentRound, phaseRound: phaseRounds })
 
-              // Use orchestrator to decide who speaks next (for brainstorming)
+              // Use orchestrator to decide who speaks next (only every 3 rounds to save tokens)
               let orchestratorResult: OrchestratorResponse | null = null
               let nextExperts: Expert[] = experts
 
-              if (isBrainstorming && phaseRounds > 1) {
-                // Let orchestrator decide
+              // Only call orchestrator every 3 rounds in brainstorming to save tokens
+              const shouldCallOrchestrator = isBrainstorming && phaseRounds > 1 && (phaseRounds % 3 === 0 || phaseRounds >= phaseConfig.maxRounds - 1)
+
+              if (shouldCallOrchestrator) {
                 orchestratorResult = await getOrchestratorDecision(
                   requirement,
                   features,
@@ -189,6 +202,10 @@ export async function POST(req: NextRequest) {
                     nextExperts = [nextExpert]
                   }
                 }
+              } else if (isBrainstorming) {
+                // Rotate experts without calling orchestrator
+                const expertIndex = (phaseRounds - 1) % experts.length
+                nextExperts = [experts[expertIndex]]
               }
 
               // Each selected expert speaks
@@ -295,8 +312,18 @@ export async function POST(req: NextRequest) {
                   totalTokensUsed,
                 })
 
+                // Extract feature consensus from expert message (lightweight detection)
+                const featureUpdates = extractFeatureConsensus(fullContent, features, expert.id)
+                if (featureUpdates.length > 0) {
+                  sendEvent('feature_consensus', {
+                    updates: featureUpdates,
+                    fromExpert: expert.id,
+                    round: currentRound,
+                  })
+                }
+
                 // Small delay between experts for natural flow
-                await new Promise(resolve => setTimeout(resolve, 300))
+                await new Promise(resolve => setTimeout(resolve, 200))
               }
 
               sendEvent('round_complete', {
@@ -598,6 +625,89 @@ function getPhaseNameChinese(phase: DiscussionPhase): string {
     validation: '最终确认',
   }
   return names[phase]
+}
+
+// Lightweight feature consensus extraction (no AI call, just pattern matching)
+interface FeatureUpdate {
+  featureName: string
+  status: 'confirmed' | 'modified' | 'new' | 'removed'
+  note?: string
+  expertId: string
+}
+
+function extractFeatureConsensus(
+  content: string,
+  features: Array<{ name: string; description: string }>,
+  expertId: string
+): FeatureUpdate[] {
+  const updates: FeatureUpdate[] = []
+  const contentLower = content.toLowerCase()
+
+  // Keywords indicating consensus
+  const confirmKeywords = ['确认', '同意', '认可', '赞同', '支持', '必须', '核心', 'MVP', '闭环']
+  const removeKeywords = ['不需要', '可以去掉', '砍掉', '暂时不', '后期再', '延期', '不是必须']
+  const modifyKeywords = ['建议', '调整', '改为', '优化', '简化', '增加', '补充']
+
+  // Check each feature mentioned in the content
+  for (const feature of features) {
+    const featureInContent = content.includes(feature.name) ||
+      content.includes(feature.name.replace(/系统|模块|功能/g, ''))
+
+    if (featureInContent) {
+      // Check if confirmed
+      if (confirmKeywords.some(kw => contentLower.includes(kw))) {
+        updates.push({
+          featureName: feature.name,
+          status: 'confirmed',
+          expertId,
+        })
+      }
+      // Check if suggested removal
+      else if (removeKeywords.some(kw => contentLower.includes(kw))) {
+        updates.push({
+          featureName: feature.name,
+          status: 'removed',
+          note: '专家建议延后或移除',
+          expertId,
+        })
+      }
+      // Check if modified
+      else if (modifyKeywords.some(kw => contentLower.includes(kw))) {
+        updates.push({
+          featureName: feature.name,
+          status: 'modified',
+          note: '专家建议调整',
+          expertId,
+        })
+      }
+    }
+  }
+
+  // Detect new features mentioned (simple pattern matching)
+  const newFeaturePatterns = [
+    /需要增加[：:]?\s*(.{2,20})/g,
+    /建议添加[：:]?\s*(.{2,20})/g,
+    /还需要[：:]?\s*(.{2,20})功能/g,
+    /补充[：:]?\s*(.{2,20})/g,
+  ]
+
+  for (const pattern of newFeaturePatterns) {
+    let match
+    while ((match = pattern.exec(content)) !== null) {
+      const newFeatureName = match[1].trim()
+      // Check if this is not an existing feature
+      if (!features.some(f => f.name.includes(newFeatureName) || newFeatureName.includes(f.name))) {
+        updates.push({
+          featureName: newFeatureName,
+          status: 'new',
+          note: '新识别功能',
+          expertId,
+        })
+      }
+    }
+  }
+
+  return updates
 }
 
 function buildExpertPrompt(
