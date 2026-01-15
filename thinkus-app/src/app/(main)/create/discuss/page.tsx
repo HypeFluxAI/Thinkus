@@ -313,8 +313,10 @@ export default function DiscussPage() {
                         const existingIndex = updated.findIndex(
                           f => f.name.toLowerCase() === update.featureName.toLowerCase()
                         )
+                        // Backend sends 'status' field
+                        const action = update.status || update.action
 
-                        switch (update.action) {
+                        switch (action) {
                           case 'confirmed':
                             if (existingIndex >= 0) {
                               updated[existingIndex] = {
@@ -325,12 +327,12 @@ export default function DiscussPage() {
                             }
                             break
                           case 'modified':
-                            if (existingIndex >= 0 && update.newDescription) {
+                            if (existingIndex >= 0) {
                               updated[existingIndex] = {
                                 ...updated[existingIndex],
-                                description: update.newDescription,
+                                description: update.newDescription || updated[existingIndex].description,
                                 status: 'modified' as const,
-                                expertNotes: `${data.fromExpert} 建议调整`,
+                                expertNotes: update.note || `${data.fromExpert} 建议调整`,
                               }
                             }
                             break
@@ -339,7 +341,7 @@ export default function DiscussPage() {
                               updated.push({
                                 id: `feat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                                 name: update.featureName,
-                                description: update.newDescription || '',
+                                description: update.newDescription || update.description || '',
                                 priority: 'medium',
                                 status: 'new' as const,
                                 expertNotes: `${data.fromExpert} 新增建议`,
@@ -351,7 +353,7 @@ export default function DiscussPage() {
                               updated[existingIndex] = {
                                 ...updated[existingIndex],
                                 status: 'removed' as const,
-                                expertNotes: `${data.fromExpert} 建议移除`,
+                                expertNotes: update.note || `${data.fromExpert} 建议移除`,
                               }
                             }
                             break
