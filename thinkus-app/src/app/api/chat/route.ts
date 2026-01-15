@@ -61,8 +61,22 @@ export async function POST(req: NextRequest) {
 
     const encoder = new TextEncoder()
 
+    let isClosed = false
+
     const readable = new ReadableStream({
       async start(controller) {
+        // Helper to safely enqueue data
+        const safeEnqueue = (data: Uint8Array) => {
+          if (isClosed) return false
+          try {
+            controller.enqueue(data)
+            return true
+          } catch {
+            isClosed = true
+            return false
+          }
+        }
+
         try {
           if (useGemini) {
             // 使用 Gemini
@@ -75,7 +89,7 @@ export async function POST(req: NextRequest) {
             for await (const event of generator) {
               if (event.type === 'content_block_delta' && event.delta?.text) {
                 const data = JSON.stringify({ type: 'text', content: event.delta.text })
-                controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+                if (!safeEnqueue(encoder.encode(`data: ${data}\n\n`))) break
               }
             }
           } else {
@@ -90,17 +104,29 @@ export async function POST(req: NextRequest) {
             for await (const event of stream) {
               if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
                 const data = JSON.stringify({ type: 'text', content: event.delta.text })
-                controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+                if (!safeEnqueue(encoder.encode(`data: ${data}\n\n`))) break
               }
             }
           }
 
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
-          controller.close()
+          if (!isClosed) {
+            safeEnqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
+            controller.close()
+            isClosed = true
+          }
         } catch (error) {
-          console.error('Stream error:', error)
-          controller.error(error)
+          if (!isClosed) {
+            console.error('Stream error:', error)
+            try {
+              controller.error(error)
+            } catch {
+              // Controller already closed
+            }
+          }
         }
+      },
+      cancel() {
+        isClosed = true
       },
     })
 

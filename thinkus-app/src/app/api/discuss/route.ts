@@ -83,13 +83,22 @@ export async function POST(req: NextRequest) {
     const targetRounds = modeConfig.targetRounds
 
     const encoder = new TextEncoder()
+    let isClosed = false
 
     const readable = new ReadableStream({
       async start(controller) {
-        const sendEvent = (type: string, data: unknown) => {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type, ...data as object })}\n\n`)
-          )
+        // Safe event sender that checks if controller is still open
+        const sendEvent = (type: string, data: unknown): boolean => {
+          if (isClosed) return false
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type, ...data as object })}\n\n`)
+            )
+            return true
+          } catch {
+            isClosed = true
+            return false
+          }
         }
 
         try {
@@ -482,12 +491,24 @@ export async function POST(req: NextRequest) {
             estimatedCost: totalTokensUsed * 0.00001 * 2,
           })
 
-          controller.close()
+          if (!isClosed) {
+            controller.close()
+            isClosed = true
+          }
         } catch (error) {
-          console.error('Discussion error:', error)
-          sendEvent('error', { message: 'Discussion failed', error: String(error) })
-          controller.error(error)
+          if (!isClosed) {
+            console.error('Discussion error:', error)
+            sendEvent('error', { message: 'Discussion failed', error: String(error) })
+            try {
+              controller.error(error)
+            } catch {
+              // Controller already closed
+            }
+          }
         }
+      },
+      cancel() {
+        isClosed = true
       },
     })
 
