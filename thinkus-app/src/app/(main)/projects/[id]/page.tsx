@@ -41,9 +41,12 @@ import {
   Calendar,
   Share2,
 } from 'lucide-react'
-import { PhaseBadge, PhaseTimeline, ShareDialog } from '@/components/project'
+import { PhaseBadge, PhaseTimeline, ShareDialog, SimpleStatusPanel } from '@/components/project'
+import { DeliveryOverview, DeliveryStatusBadge } from '@/components/delivery'
+import { useDeliveryProgress, useDeliveryStream } from '@/hooks/delivery'
 import { StandupPanel } from '@/components/standup'
 import { EmptyState, emptyStatePresets } from '@/components/ui/empty-state'
+import type { ProjectStatusInput } from '@/lib/services/status-aggregator'
 import { type ProjectPhase, PROJECT_PHASES } from '@/lib/config/project-phases'
 import { EXECUTIVES, type AgentId } from '@/lib/config/executives'
 import { trpc } from '@/lib/trpc/client'
@@ -94,9 +97,24 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [actionItems, setActionItems] = useState<ProjectActionItem[]>([])
   const [loading, setLoading] = useState({ decisions: true, actionItems: true })
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [statusInput, setStatusInput] = useState<ProjectStatusInput | undefined>(undefined)
 
   // Fetch project data from tRPC
   const { data: projectData, isLoading: projectLoading, error: projectError } = trpc.project.getById.useQuery({ id: projectId })
+
+  // Delivery progress hooks
+  const {
+    session: progressSession,
+    isLoading: deliveryLoading,
+  } = useDeliveryProgress({
+    projectId,
+    autoStart: true,
+    pollInterval: 10000, // 10 seconds
+  })
+
+  const { isConnected } = useDeliveryStream({
+    projectId,
+  })
 
   const project = projectData?.project as unknown as IProject | undefined
 
@@ -132,6 +150,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
     fetchData()
   }, [projectId])
+
+  // Fetch project status for SimpleStatusPanel
+  useEffect(() => {
+    async function fetchStatus() {
+      if (!project) return
+
+      // Only show status panel for deployed projects
+      if (!['in_progress', 'completed', 'active'].includes(project.status)) return
+
+      try {
+        const res = await fetch(`/api/projects/${projectId}/status`)
+        if (res.ok) {
+          const data = await res.json()
+          setStatusInput(data.statusInput)
+        }
+      } catch (error) {
+        console.error('Failed to fetch project status:', error)
+      }
+    }
+
+    fetchStatus()
+  }, [projectId, project])
 
   // Loading state
   if (projectLoading) {
@@ -237,6 +277,53 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       />
 
       <main id="main-content" className="container mx-auto px-4 py-6 max-w-5xl">
+        {/* Simple Status Panel - Only show for deployed projects */}
+        {statusInput && ['in_progress', 'completed', 'active'].includes(project.status) && (
+          <SimpleStatusPanel
+            projectId={projectId}
+            statusInput={statusInput}
+            autoRefresh={true}
+            refreshInterval={60}
+            size="md"
+            showIssues={true}
+            onRefresh={async () => {
+              try {
+                const res = await fetch(`/api/projects/${projectId}/status`)
+                if (res.ok) {
+                  const data = await res.json()
+                  return data.statusInput
+                }
+              } catch (error) {
+                console.error('Failed to refresh status:', error)
+              }
+              return undefined
+            }}
+            onContactSupport={() => {
+              window.open('mailto:support@thinkus.app?subject=项目问题: ' + project.name, '_blank')
+            }}
+            onViewDetails={() => {
+              router.push(`/projects/${projectId}/status`)
+            }}
+            className="mb-6"
+          />
+        )}
+
+        {/* Delivery Overview - Show for projects in delivery phase */}
+        {['paid', 'in_progress'].includes(project.status) && (
+          <DeliveryOverview
+            projectName={project.name}
+            progressSession={progressSession}
+            isConnected={isConnected}
+            onViewProgress={() => router.push(`/projects/${projectId}/progress`)}
+            onViewAcceptance={() => router.push(`/projects/${projectId}/delivery`)}
+            onViewNotifications={() => router.push(`/projects/${projectId}/delivery?tab=notifications`)}
+            onContactSupport={() => {
+              window.open('mailto:support@thinkus.app?subject=交付问题: ' + project.name, '_blank')
+            }}
+            className="mb-6"
+          />
+        )}
+
         {/* Overview */}
         <Card className="mb-6">
           <CardContent className="p-6">
@@ -378,6 +465,30 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          {/* Delivery Center - Show for projects in delivery phase */}
+          {['paid', 'in_progress'].includes(project.status) && (
+            <Link href={`/projects/${projectId}/delivery`}>
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer border-emerald-200 bg-emerald-50/30">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-emerald-500/10">
+                      <Rocket className="h-5 w-5 text-emerald-500" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">交付中心</span>
+                      {progressSession && (
+                        <DeliveryStatusBadge
+                          status={progressSession.currentStage}
+                          progress={progressSession.overallProgress}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </CardContent>
+              </Card>
+            </Link>
+          )}
           <Link href={`/projects/${projectId}/analytics`}>
             <Card className="hover:border-primary/50 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center justify-between">
