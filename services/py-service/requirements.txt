@@ -8,7 +8,7 @@ grpcio-tools==1.68.1
 protobuf==5.29.2
 
 # Database
-pymongo==4.10.1
+pymongo==4.9.2
 motor==3.6.0
 redis==5.2.1
 

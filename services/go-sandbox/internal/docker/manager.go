@@ -20,9 +20,10 @@ import (
 type SandboxImage string
 
 const (
-	ImageNode   SandboxImage = "node:20-alpine"
-	ImagePython SandboxImage = "python:3.11-alpine"
-	ImageFull   SandboxImage = "thinkus/sandbox:latest"
+	ImageNode      SandboxImage = "node:20-alpine"
+	ImagePython    SandboxImage = "python:3.11-alpine"
+	ImageFull      SandboxImage = "thinkus/sandbox:latest"
+	ImageClaudeCode SandboxImage = "thinkus/claude-code:latest"
 )
 
 // SandboxStatus represents the status of a sandbox
@@ -79,6 +80,14 @@ var (
 	sandboxes    = make(map[string]*Sandbox)
 	mu           sync.RWMutex
 	baseDataDir  = "/data/sandboxes"
+
+	// imageMapping maps short names to full image names
+	imageMapping = map[string]SandboxImage{
+		"node":        ImageNode,
+		"python":      ImagePython,
+		"full":        ImageFull,
+		"claude-code": ImageClaudeCode,
+	}
 )
 
 // SetBaseDataDir sets the base data directory (for testing)
@@ -123,13 +132,15 @@ func CreateSandbox(ctx context.Context, projectID, userID string, cfg *SandboxCo
 		return nil, err
 	}
 
-	// Pull image if needed
+	// Resolve image name (support short names like "claude-code")
 	imageName := string(cfg.Image)
 	if cfg.Image == "" {
 		imageName = string(ImageNode)
+	} else if mappedImage, ok := imageMapping[string(cfg.Image)]; ok {
+		imageName = string(mappedImage)
 	}
 
-	// Create container
+	// Create container config
 	containerConfig := &container.Config{
 		Image:        imageName,
 		Tty:          true,
@@ -137,6 +148,16 @@ func CreateSandbox(ctx context.Context, projectID, userID string, cfg *SandboxCo
 		AttachStderr: true,
 		WorkingDir:   "/workspace",
 		Cmd:          []string{"/bin/sh"},
+	}
+
+	// Inject ANTHROPIC_API_KEY for Claude Code containers
+	if imageName == string(ImageClaudeCode) {
+		apiKey := os.Getenv("ANTHROPIC_API_KEY")
+		if apiKey != "" {
+			containerConfig.Env = []string{
+				fmt.Sprintf("ANTHROPIC_API_KEY=%s", apiKey),
+			}
+		}
 	}
 
 	hostConfig := &container.HostConfig{

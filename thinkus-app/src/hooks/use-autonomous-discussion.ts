@@ -230,120 +230,163 @@ export function useAutonomousDiscussion(
 
     const decoder = new TextDecoder()
     const currentMessages = new Map<string, ExecutiveMessage>()
+    let buffer = '' // 缓冲不完整的行
+
+    // 处理单行 SSE 数据
+    const processLine = (line: string) => {
+      if (!line.startsWith('data: ')) return
+
+      try {
+        const data = JSON.parse(line.slice(6))
+
+        switch (data.type) {
+          case 'discussion_init':
+            setParticipants(data.participants)
+            setMaxRounds(data.maxRounds)
+            setCurrentRound(data.currentRound)
+            break
+
+          case 'round_start':
+            setCurrentRound(data.round)
+            break
+
+          case 'orchestrator_decision':
+            if (data.keyInsights) {
+              setKeyInsights(prev => [...new Set([...prev, ...data.keyInsights])])
+            }
+            if (data.consensusLevel !== undefined) {
+              setConsensusLevel(data.consensusLevel)
+            }
+            break
+
+          case 'expert_speaking':
+            setSpeakingAgentId(data.agentId)
+            // 创建占位消息
+            const msgId = `msg-${data.round}-${data.agentId}`
+            const newMsg: ExecutiveMessage = {
+              id: msgId,
+              agentId: data.agentId,
+              content: '',
+              role: 'executive',
+              round: data.round,
+              timestamp: new Date(),
+              isStreaming: true,
+            }
+            currentMessages.set(msgId, newMsg)
+            setMessages(prev => [...prev.filter(m => m.id !== msgId), newMsg])
+            break
+
+          case 'expert_message_delta':
+            {
+              const deltaKey = `msg-${data.round}-${data.agentId}`
+              const existingDelta = currentMessages.get(deltaKey)
+              if (existingDelta) {
+                // 创建新对象以确保 React 检测到变化
+                const updatedDelta = {
+                  ...existingDelta,
+                  content: existingDelta.content + data.content,
+                }
+                currentMessages.set(deltaKey, updatedDelta)
+                setMessages(prev =>
+                  prev.map(m => m.id === deltaKey ? updatedDelta : m)
+                )
+              } else {
+                console.warn('[Autonomous Discussion] No existing message for delta:', deltaKey)
+              }
+            }
+            break
+
+          case 'expert_message_complete':
+            {
+              const completeKey = `msg-${data.round}-${data.agentId}`
+              const completedExpert = currentMessages.get(completeKey)
+              if (completedExpert) {
+                // 使用服务器返回的完整内容创建新对象
+                const finalExpert = {
+                  ...completedExpert,
+                  content: data.content,
+                  isStreaming: false,
+                }
+                currentMessages.set(completeKey, finalExpert)
+                setMessages(prev =>
+                  prev.map(m => m.id === completeKey ? finalExpert : m)
+                )
+                onMessage?.(finalExpert)
+              } else {
+                console.warn('[Autonomous Discussion] No existing message for complete:', completeKey)
+              }
+              setSpeakingAgentId(null)
+            }
+            break
+
+          case 'round_complete':
+            setCurrentRound(data.round)
+            onRoundComplete?.(data.round)
+            break
+
+          case 'discussion_converging':
+            // 讨论收敛
+            break
+
+          case 'summary_complete':
+            if (data.summary) {
+              setSummary(data.summary)
+              onSummaryComplete?.(data.summary)
+            }
+            break
+
+          case 'decision_classified':
+            const classification: DecisionClassification = {
+              decision: data.decision,
+              ...data.classification,
+            }
+            setDecisions(prev => [...prev, classification])
+            onDecisionClassified?.(classification)
+            break
+
+          case 'discussion_complete':
+            if (data.summary) {
+              setSummary(data.summary)
+            }
+            break
+
+          case 'error':
+            onError?.(data.message || '讨论出错')
+            break
+        }
+      } catch (e) {
+        console.error('[Autonomous Discussion] JSON parse error:', e, 'Line:', line.substring(0, 200))
+      }
+    }
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      const chunk = decoder.decode(value)
-      const lines = chunk.split('\n')
+      // 使用 stream: true 确保多字节字符（如中文）不会被截断
+      const chunk = decoder.decode(value, { stream: true })
+      buffer += chunk
+      const lines = buffer.split('\n')
+
+      // 保留最后一个可能不完整的行
+      buffer = lines.pop() || ''
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6))
+        processLine(line)
+      }
+    }
 
-            switch (data.type) {
-              case 'discussion_init':
-                setParticipants(data.participants)
-                setMaxRounds(data.maxRounds)
-                setCurrentRound(data.currentRound)
-                break
+    // 流结束时，刷新 decoder 并处理剩余 buffer
+    const finalChunk = decoder.decode() // Flush any remaining bytes
+    if (finalChunk) {
+      buffer += finalChunk
+    }
 
-              case 'round_start':
-                setCurrentRound(data.round)
-                break
-
-              case 'orchestrator_decision':
-                if (data.keyInsights) {
-                  setKeyInsights(prev => [...new Set([...prev, ...data.keyInsights])])
-                }
-                if (data.consensusLevel !== undefined) {
-                  setConsensusLevel(data.consensusLevel)
-                }
-                break
-
-              case 'expert_speaking':
-                setSpeakingAgentId(data.agentId)
-                // 创建占位消息
-                const msgId = `msg-${data.round}-${data.agentId}`
-                const newMsg: ExecutiveMessage = {
-                  id: msgId,
-                  agentId: data.agentId,
-                  content: '',
-                  role: 'executive',
-                  round: data.round,
-                  timestamp: new Date(),
-                  isStreaming: true,
-                }
-                currentMessages.set(msgId, newMsg)
-                setMessages(prev => [...prev.filter(m => m.id !== msgId), newMsg])
-                break
-
-              case 'expert_message_delta':
-                const deltaKey = `msg-${data.round}-${data.agentId}`
-                const existing = currentMessages.get(deltaKey)
-                if (existing) {
-                  existing.content += data.content
-                  setMessages(prev =>
-                    prev.map(m => m.id === deltaKey ? { ...existing } : m)
-                  )
-                }
-                break
-
-              case 'expert_message_complete':
-                const completeKey = `msg-${data.round}-${data.agentId}`
-                const completed = currentMessages.get(completeKey)
-                if (completed) {
-                  completed.content = data.content
-                  completed.isStreaming = false
-                  setMessages(prev =>
-                    prev.map(m => m.id === completeKey ? { ...completed } : m)
-                  )
-                  onMessage?.(completed)
-                }
-                setSpeakingAgentId(null)
-                break
-
-              case 'round_complete':
-                setCurrentRound(data.round)
-                onRoundComplete?.(data.round)
-                break
-
-              case 'discussion_converging':
-                // 讨论收敛
-                break
-
-              case 'summary_complete':
-                if (data.summary) {
-                  setSummary(data.summary)
-                  onSummaryComplete?.(data.summary)
-                }
-                break
-
-              case 'decision_classified':
-                const classification: DecisionClassification = {
-                  decision: data.decision,
-                  ...data.classification,
-                }
-                setDecisions(prev => [...prev, classification])
-                onDecisionClassified?.(classification)
-                break
-
-              case 'discussion_complete':
-                if (data.summary) {
-                  setSummary(data.summary)
-                }
-                break
-
-              case 'error':
-                onError?.(data.message || '讨论出错')
-                break
-            }
-          } catch {
-            // JSON解析错误，忽略
-          }
-        }
+    // 处理剩余的 buffer（如果有完整行）
+    if (buffer.trim()) {
+      const remainingLines = buffer.split('\n')
+      for (const line of remainingLines) {
+        processLine(line)
       }
     }
   }

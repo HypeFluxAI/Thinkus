@@ -39,6 +39,12 @@ import {
   migrateOldSessionData,
 } from '@/lib/utils/discussion-session'
 
+interface DeferredFeature {
+  name: string
+  reason: string
+  suggestedPhase?: string
+}
+
 interface Proposal {
   projectName: string
   positioning: string
@@ -51,7 +57,9 @@ interface Proposal {
     priority: string
     approved: boolean
     expertNotes?: string
+    includedInMvp?: boolean
   }>
+  deferredFeatures?: DeferredFeature[]
   techStack: {
     frontend: string[]
     backend: string[]
@@ -195,213 +203,263 @@ export default function DiscussPage() {
 
       const decoder = new TextDecoder()
       const currentMessages: Map<string, DiscussionMessage> = new Map()
+      let buffer = '' // 缓冲不完整的行
 
       // Preserve existing messages if continuing
       if (!userMessage) {
         setMessages([])
       }
 
+      // 处理单行 SSE 数据的函数
+      const processLine = (line: string) => {
+        if (!line.startsWith('data: ')) return
+
+        try {
+          const data = JSON.parse(line.slice(6))
+          handleSSEEvent(data, currentMessages)
+        } catch (e) {
+          console.error('[Discuss SSE] JSON parse error:', e, 'Line:', line.substring(0, 200))
+        }
+      }
+
+      // 处理 SSE 事件的函数
+      const handleSSEEvent = (data: any, currentMessages: Map<string, DiscussionMessage>) => {
+        switch (data.type) {
+          case 'discussion_init':
+            setExperts(data.experts.map((e: any) => ({
+              ...e,
+              focus: '',
+              personality: '',
+            })))
+            setTargetRounds(data.targetRounds)
+            setCurrentRound(data.currentRound)
+            break
+
+          case 'phase_start':
+            setCurrentPhase(data.phase)
+            // Enable user input for phases that allow it
+            const phaseConfig = DISCUSSION_PHASES.find(p => p.id === data.phase)
+            setCanUserSpeak(phaseConfig?.allowUserInput || false)
+            break
+
+          case 'round_start':
+            setCurrentRound(data.round)
+            break
+
+          case 'user_message':
+            // Add user message to display
+            const userMsgId = `user-${Date.now()}`
+            currentMessages.set(userMsgId, {
+              id: userMsgId,
+              expertId: 'user',
+              content: data.content,
+              timestamp: new Date(),
+              isStreaming: false,
+              isUser: true,
+            })
+            setMessages(Array.from(currentMessages.values()))
+            break
+
+          case 'orchestrator_decision':
+            if (data.keyInsights) {
+              setKeyInsights(prev => [...prev, ...data.keyInsights].slice(-5))
+            }
+            break
+
+          case 'expert_speaking':
+            setSpeakingExpertId(data.expertId)
+            // Create placeholder message
+            const msgId = `msg-${Date.now()}-${data.expertId}`
+            const mapKey = `${data.expertId}-${data.round}`
+            currentMessages.set(mapKey, {
+              id: msgId,
+              expertId: data.expertId,
+              content: '',
+              timestamp: new Date(),
+              isStreaming: true,
+              round: data.round,
+            })
+            setMessages(Array.from(currentMessages.values()))
+            break
+
+          case 'expert_message_delta':
+            {
+              const deltaKey = `${data.expertId}-${data.round}`
+              const existingMsg = currentMessages.get(deltaKey)
+              if (existingMsg) {
+                // 创建新对象以触发 React 重新渲染
+                const updatedMsg = {
+                  ...existingMsg,
+                  content: existingMsg.content + data.content,
+                }
+                currentMessages.set(deltaKey, updatedMsg)
+                setMessages(Array.from(currentMessages.values()))
+              } else {
+                console.warn('[Discuss SSE] No existing message for delta:', deltaKey)
+              }
+            }
+            break
+
+          case 'expert_message_complete':
+            {
+              const completeKey = `${data.expertId}-${data.round}`
+              const completedMsg = currentMessages.get(completeKey)
+              if (completedMsg) {
+                // 创建新对象，使用服务器返回的完整内容
+                const finalMsg = {
+                  ...completedMsg,
+                  isStreaming: false,
+                  content: data.content,  // 使用完整内容替换
+                }
+                currentMessages.set(completeKey, finalMsg)
+                setMessages(Array.from(currentMessages.values()))
+              } else {
+                console.warn('[Discuss SSE] No existing message for complete:', completeKey)
+              }
+              setSpeakingExpertId(undefined)
+
+              // Update history for potential user continuation
+              setDiscussionHistory(prev => [...prev, {
+                expertId: data.expertId,
+                content: data.content,
+                role: 'expert',
+                round: data.round,
+              }])
+            }
+            break
+
+          case 'round_complete':
+            setCurrentRound(data.round)
+            // Allow user to speak between rounds in brainstorming
+            if (mode === 'brainstorm' || mode === 'expert') {
+              setCanUserSpeak(true)
+            }
+            break
+
+          case 'feature_consensus':
+            // Real-time feature consensus updates from expert discussion
+            if (data.updates && Array.isArray(data.updates)) {
+              setFeatures(prev => {
+                const updated = [...prev]
+                for (const update of data.updates) {
+                  const existingIndex = updated.findIndex(
+                    f => f.name.toLowerCase() === update.featureName.toLowerCase()
+                  )
+                  // Backend sends 'status' field
+                  const action = update.status || update.action
+
+                  switch (action) {
+                    case 'confirmed':
+                      if (existingIndex >= 0) {
+                        updated[existingIndex] = {
+                          ...updated[existingIndex],
+                          status: 'confirmed' as const,
+                          expertNotes: `${data.fromExpert} 确认`,
+                        }
+                      }
+                      break
+                    case 'modified':
+                      if (existingIndex >= 0) {
+                        updated[existingIndex] = {
+                          ...updated[existingIndex],
+                          description: update.newDescription || updated[existingIndex].description,
+                          status: 'modified' as const,
+                          expertNotes: update.note || `${data.fromExpert} 建议调整`,
+                        }
+                      }
+                      break
+                    case 'new':
+                      if (existingIndex < 0) {
+                        updated.push({
+                          id: `feat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                          name: update.featureName,
+                          description: update.newDescription || update.description || '',
+                          priority: 'medium',
+                          status: 'new' as const,
+                          expertNotes: `${data.fromExpert} 新增建议`,
+                        })
+                      }
+                      break
+                    case 'removed':
+                      if (existingIndex >= 0) {
+                        updated[existingIndex] = {
+                          ...updated[existingIndex],
+                          status: 'removed' as const,
+                          expertNotes: update.note || `${data.fromExpert} 建议移除`,
+                        }
+                      }
+                      break
+                  }
+                }
+                return updated
+              })
+            }
+            break
+
+          case 'target_rounds_reached':
+            toast.info(data.message || '已达到目标轮数，准备生成方案')
+            setCanUserSpeak(false)
+            break
+
+          case 'phase_converging':
+            toast.info(`讨论收敛: ${data.reason}`)
+            setCanUserSpeak(false)
+            break
+
+          case 'synthesis_start':
+            setCanUserSpeak(false)
+            toast.info('正在综合所有讨论生成方案...')
+            break
+
+          case 'synthesis_complete':
+            if (data.proposal) {
+              setProposal(data.proposal)
+            }
+            break
+
+          case 'discussion_complete':
+            setIsDiscussing(false)
+            setCanUserSpeak(false)
+            if (data.proposal) {
+              toast.success(`讨论完成！共 ${data.totalRounds} 轮讨论`)
+            }
+            break
+
+          case 'error':
+            toast.error(data.message || '讨论出错')
+            setIsDiscussing(false)
+            break
+        }
+      }
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
+        // 使用 stream: true 确保多字节字符（如中文）不会被截断
+        const chunk = decoder.decode(value, { stream: true })
+        buffer += chunk
+        const lines = buffer.split('\n')
+
+        // 保留最后一个可能不完整的行
+        buffer = lines.pop() || ''
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6))
+          processLine(line)
+        }
+      }
 
-              switch (data.type) {
-                case 'discussion_init':
-                  setExperts(data.experts.map((e: any) => ({
-                    ...e,
-                    focus: '',
-                    personality: '',
-                  })))
-                  setTargetRounds(data.targetRounds)
-                  setCurrentRound(data.currentRound)
-                  break
+      // 流结束时，刷新 decoder 并处理剩余 buffer
+      const finalChunk = decoder.decode() // Flush any remaining bytes
+      if (finalChunk) {
+        buffer += finalChunk
+      }
 
-                case 'phase_start':
-                  setCurrentPhase(data.phase)
-                  // Enable user input for phases that allow it
-                  const phaseConfig = DISCUSSION_PHASES.find(p => p.id === data.phase)
-                  setCanUserSpeak(phaseConfig?.allowUserInput || false)
-                  break
-
-                case 'round_start':
-                  setCurrentRound(data.round)
-                  break
-
-                case 'user_message':
-                  // Add user message to display
-                  const userMsgId = `user-${Date.now()}`
-                  currentMessages.set(userMsgId, {
-                    id: userMsgId,
-                    expertId: 'user',
-                    content: data.content,
-                    timestamp: new Date(),
-                    isStreaming: false,
-                    isUser: true,
-                  })
-                  setMessages(Array.from(currentMessages.values()))
-                  break
-
-                case 'orchestrator_decision':
-                  if (data.keyInsights) {
-                    setKeyInsights(prev => [...prev, ...data.keyInsights].slice(-5))
-                  }
-                  break
-
-                case 'expert_speaking':
-                  setSpeakingExpertId(data.expertId)
-                  // Create placeholder message
-                  const msgId = `msg-${Date.now()}-${data.expertId}`
-                  currentMessages.set(data.expertId + data.round, {
-                    id: msgId,
-                    expertId: data.expertId,
-                    content: '',
-                    timestamp: new Date(),
-                    isStreaming: true,
-                    round: data.round,
-                  })
-                  setMessages(Array.from(currentMessages.values()))
-                  break
-
-                case 'expert_message_delta':
-                  const existing = currentMessages.get(data.expertId + data.round)
-                  if (existing) {
-                    existing.content += data.content
-                    setMessages(Array.from(currentMessages.values()))
-                  }
-                  break
-
-                case 'expert_message_complete':
-                  const completed = currentMessages.get(data.expertId + data.round)
-                  if (completed) {
-                    completed.isStreaming = false
-                    completed.content = data.content
-                    setMessages(Array.from(currentMessages.values()))
-                  }
-                  setSpeakingExpertId(undefined)
-
-                  // Update history for potential user continuation
-                  setDiscussionHistory(prev => [...prev, {
-                    expertId: data.expertId,
-                    content: data.content,
-                    role: 'expert',
-                    round: data.round,
-                  }])
-                  break
-
-                case 'round_complete':
-                  setCurrentRound(data.round)
-                  // Allow user to speak between rounds in brainstorming
-                  if (mode === 'brainstorm' || mode === 'expert') {
-                    setCanUserSpeak(true)
-                  }
-                  break
-
-                case 'feature_consensus':
-                  // Real-time feature consensus updates from expert discussion
-                  if (data.updates && Array.isArray(data.updates)) {
-                    setFeatures(prev => {
-                      const updated = [...prev]
-                      for (const update of data.updates) {
-                        const existingIndex = updated.findIndex(
-                          f => f.name.toLowerCase() === update.featureName.toLowerCase()
-                        )
-                        // Backend sends 'status' field
-                        const action = update.status || update.action
-
-                        switch (action) {
-                          case 'confirmed':
-                            if (existingIndex >= 0) {
-                              updated[existingIndex] = {
-                                ...updated[existingIndex],
-                                status: 'confirmed' as const,
-                                expertNotes: `${data.fromExpert} 确认`,
-                              }
-                            }
-                            break
-                          case 'modified':
-                            if (existingIndex >= 0) {
-                              updated[existingIndex] = {
-                                ...updated[existingIndex],
-                                description: update.newDescription || updated[existingIndex].description,
-                                status: 'modified' as const,
-                                expertNotes: update.note || `${data.fromExpert} 建议调整`,
-                              }
-                            }
-                            break
-                          case 'new':
-                            if (existingIndex < 0) {
-                              updated.push({
-                                id: `feat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                                name: update.featureName,
-                                description: update.newDescription || update.description || '',
-                                priority: 'medium',
-                                status: 'new' as const,
-                                expertNotes: `${data.fromExpert} 新增建议`,
-                              })
-                            }
-                            break
-                          case 'removed':
-                            if (existingIndex >= 0) {
-                              updated[existingIndex] = {
-                                ...updated[existingIndex],
-                                status: 'removed' as const,
-                                expertNotes: update.note || `${data.fromExpert} 建议移除`,
-                              }
-                            }
-                            break
-                        }
-                      }
-                      return updated
-                    })
-                  }
-                  break
-
-                case 'target_rounds_reached':
-                  toast.info(data.message || '已达到目标轮数，准备生成方案')
-                  setCanUserSpeak(false)
-                  break
-
-                case 'phase_converging':
-                  toast.info(`讨论收敛: ${data.reason}`)
-                  setCanUserSpeak(false)
-                  break
-
-                case 'synthesis_start':
-                  setCanUserSpeak(false)
-                  toast.info('正在综合所有讨论生成方案...')
-                  break
-
-                case 'synthesis_complete':
-                  if (data.proposal) {
-                    setProposal(data.proposal)
-                  }
-                  break
-
-                case 'discussion_complete':
-                  setIsDiscussing(false)
-                  setCanUserSpeak(false)
-                  if (data.proposal) {
-                    toast.success(`讨论完成！共 ${data.totalRounds} 轮讨论`)
-                  }
-                  break
-
-                case 'error':
-                  toast.error(data.message || '讨论出错')
-                  setIsDiscussing(false)
-                  break
-              }
-            } catch {
-              // JSON parse error, ignore
-            }
-          }
+      // 处理剩余的 buffer（如果有完整行）
+      if (buffer.trim()) {
+        const remainingLines = buffer.split('\n')
+        for (const line of remainingLines) {
+          processLine(line)
         }
       }
     } catch (error) {
@@ -668,9 +726,36 @@ export default function DiscussPage() {
                     </span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">功能数量:</span>
+                    <span className="text-muted-foreground">MVP功能:</span>
                     <span className="ml-2">{proposal.features?.length || 0} 个</span>
+                    {proposal.deferredFeatures && proposal.deferredFeatures.length > 0 && (
+                      <span className="ml-1 text-muted-foreground">
+                        (推迟 {proposal.deferredFeatures.length} 个)
+                      </span>
+                    )}
                   </div>
+
+                  {/* Deferred Features */}
+                  {proposal.deferredFeatures && proposal.deferredFeatures.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <span className="text-muted-foreground text-xs">推迟到后续版本的功能:</span>
+                      <ul className="mt-1 space-y-2">
+                        {proposal.deferredFeatures.map((feature, index) => (
+                          <li key={index} className="text-xs">
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">{feature.name}</span>
+                              {feature.suggestedPhase && (
+                                <Badge variant="outline" className="text-[10px] h-4">
+                                  {feature.suggestedPhase}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-muted-foreground mt-0.5">{feature.reason}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {/* External Tools */}
                   {proposal.externalTools && proposal.externalTools.length > 0 && (

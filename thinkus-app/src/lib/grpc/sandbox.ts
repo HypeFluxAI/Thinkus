@@ -11,7 +11,7 @@ const PROTO_DIR = path.join(process.cwd(), '..', 'services', 'proto')
 
 // Types
 export interface SandboxConfig {
-  image?: 'node' | 'python' | 'full'
+  image?: 'node' | 'python' | 'full' | 'claude-code'
   cpuLimit?: number
   memoryLimit?: number // MB
   timeout?: number // seconds

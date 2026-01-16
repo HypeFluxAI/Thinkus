@@ -9,26 +9,25 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for caching
-COPY requirements.txt .
+COPY py-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy proto files and generate
-COPY ../proto /app/proto
-RUN python -m grpc_tools.protoc \
+COPY proto /app/proto
+RUN mkdir -p ./src/proto && \
+    python -m grpc_tools.protoc \
     -I./proto \
     --python_out=./src/proto \
     --grpc_python_out=./src/proto \
-    ./proto/*.proto
+    ./proto/*.proto && \
+    touch ./src/proto/__init__.py
 
 # Copy source code
-COPY src/ ./src/
-
-# Create __init__.py for proto package
-RUN touch ./src/proto/__init__.py
+COPY py-service/src/ ./src/
 
 ENV PYTHONPATH=/app
 ENV GRPC_PORT=50051
 
-EXPOSE 50051
+EXPOSE 50051 8000
 
-CMD ["python", "-m", "src.main"]
+CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

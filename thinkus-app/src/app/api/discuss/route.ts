@@ -342,7 +342,13 @@ export async function POST(req: NextRequest) {
               })
 
               // Check if phase should continue
-              if (!isBrainstorming) {
+              // 首先检查是否达到总轮数限制
+              if (currentRound >= targetRounds) {
+                shouldContinuePhase = false
+                reachedTargetRounds = true
+              }
+              // 然后检查阶段轮数限制
+              else if (!isBrainstorming) {
                 // For non-brainstorming phases, use maxRounds
                 if (phaseRounds >= phaseConfig.maxRounds) {
                   shouldContinuePhase = false

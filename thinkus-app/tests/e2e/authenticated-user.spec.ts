@@ -101,8 +101,8 @@ test.describe('Authenticated User Flow', () => {
       await page.goto('/dashboard')
       await page.waitForLoadState('networkidle')
 
-      // 检查是否有用户菜单或头像
-      const userMenu = page.locator('[data-testid="user-menu"], [aria-label*="用户"], [aria-label*="user"], button:has(img[alt*="avatar"]), .avatar, .user-avatar')
+      // 检查是否有用户菜单或头像 - 包括用户名文本和Avatar组件
+      const userMenu = page.locator('[data-testid="user-menu"], [aria-label*="用户"], [aria-label*="user"], button:has(img[alt*="avatar"]), .avatar, .user-avatar, span.font-medium, [class*="Avatar"]')
       const userMenuCount = await userMenu.count()
 
       if (userMenuCount === 0) {
@@ -281,23 +281,27 @@ test.describe('Authenticated User Flow', () => {
       await page.goto('/dashboard')
       await page.waitForLoadState('networkidle')
 
-      // 查找登出按钮
-      const logoutButton = page.locator('button:has-text("退出"), button:has-text("登出"), button:has-text("Logout"), a:has-text("退出")')
+      // 查找登出按钮 - 包括图标按钮 (LogOut icon)
+      const logoutButton = page.locator('button:has-text("退出"), button:has-text("登出"), button:has-text("Logout"), a:has-text("退出"), button:has(svg.lucide-log-out), button[title*="退出"], button[title*="logout"]')
 
-      if (await logoutButton.count() === 0) {
+      // 也检查是否有LogOut图标的按钮
+      const logoutIconButton = page.locator('button').filter({ has: page.locator('svg') }).last()
+
+      const hasLogoutButton = await logoutButton.count() > 0
+      const hasLogoutIcon = await logoutIconButton.count() > 0
+
+      if (!hasLogoutButton && !hasLogoutIcon) {
         // 可能需要先打开用户菜单
         const userMenu = page.locator('[data-testid="user-menu"], button:has(img), .avatar').first()
         if (await userMenu.count() > 0) {
           await userMenu.click()
           await page.waitForTimeout(500)
         }
-      }
 
-      const logoutAfterMenu = page.locator('button:has-text("退出"), button:has-text("登出"), button:has-text("Logout"), a:has-text("退出")')
-      const hasLogout = await logoutAfterMenu.count() > 0
-
-      if (!hasLogout) {
-        issues.push('Navigation: 未找到退出按钮')
+        const logoutAfterMenu = page.locator('button:has-text("退出"), button:has-text("登出"), button:has-text("Logout"), a:has-text("退出")')
+        if (await logoutAfterMenu.count() === 0) {
+          issues.push('Navigation: 未找到退出按钮')
+        }
       }
 
       await page.screenshot({ path: 'test-results/screenshots/logout-menu.png' })

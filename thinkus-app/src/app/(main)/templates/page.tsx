@@ -191,6 +191,16 @@ const CATEGORIES = [
   { id: 'mobile', name: '移动端', icon: Smartphone },
 ]
 
+// 模板分类对应的视觉样式
+const CATEGORY_STYLES: Record<string, { gradient: string; icon: typeof Globe; iconColor: string }> = {
+  web: { gradient: 'from-blue-500/20 via-blue-400/10 to-cyan-500/20', icon: Globe, iconColor: 'text-blue-500' },
+  ecommerce: { gradient: 'from-orange-500/20 via-amber-400/10 to-yellow-500/20', icon: ShoppingCart, iconColor: 'text-orange-500' },
+  saas: { gradient: 'from-violet-500/20 via-purple-400/10 to-indigo-500/20', icon: Building2, iconColor: 'text-violet-500' },
+  social: { gradient: 'from-pink-500/20 via-rose-400/10 to-red-500/20', icon: Users, iconColor: 'text-pink-500' },
+  content: { gradient: 'from-emerald-500/20 via-green-400/10 to-teal-500/20', icon: FileText, iconColor: 'text-emerald-500' },
+  mobile: { gradient: 'from-sky-500/20 via-blue-400/10 to-indigo-500/20', icon: Smartphone, iconColor: 'text-sky-500' },
+}
+
 export default function TemplatesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -276,12 +286,26 @@ export default function TemplatesPage() {
               </Button>
             </div>
             <div className="grid md:grid-cols-2 gap-6">
-              {featuredTemplates.slice(0, 2).map(template => (
+              {featuredTemplates.slice(0, 2).map(template => {
+                const style = CATEGORY_STYLES[template.category] || CATEGORY_STYLES.web
+                const CategoryIcon = style.icon
+                return (
                 <Card key={template.id} className="overflow-hidden group">
-                  <div className="aspect-video bg-muted relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                      <Sparkles className="h-12 w-12 text-primary/50" />
+                  <div className="aspect-video bg-muted relative overflow-hidden">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${style.gradient}`} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="relative">
+                        <div className={`absolute inset-0 blur-2xl ${style.iconColor} opacity-30`}>
+                          <CategoryIcon className="h-24 w-24" />
+                        </div>
+                        <CategoryIcon className={`h-16 w-16 ${style.iconColor} opacity-60`} />
+                      </div>
                     </div>
+                    {/* 装饰性网格 */}
+                    <div className="absolute inset-0 opacity-10" style={{
+                      backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
+                      backgroundSize: '24px 24px'
+                    }} />
                     {template.isNew && (
                       <Badge className="absolute top-3 left-3">新品</Badge>
                     )}
@@ -353,7 +377,7 @@ export default function TemplatesPage() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              )})}
             </div>
           </section>
         )}
@@ -405,12 +429,21 @@ export default function TemplatesPage() {
 
         {/* Template Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredTemplates.map(template => (
-            <Card key={template.id} className="overflow-hidden group hover:shadow-lg transition-shadow">
-              <div className="aspect-video bg-muted relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent flex items-center justify-center">
-                  <Sparkles className="h-8 w-8 text-primary/30" />
+          {filteredTemplates.map(template => {
+            const style = CATEGORY_STYLES[template.category] || CATEGORY_STYLES.web
+            const CategoryIcon = style.icon
+            return (
+            <Card key={template.id} className="overflow-hidden group hover:shadow-lg transition-all hover:-translate-y-1">
+              <div className="aspect-video bg-muted relative overflow-hidden">
+                <div className={`absolute inset-0 bg-gradient-to-br ${style.gradient}`} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <CategoryIcon className={`h-10 w-10 ${style.iconColor} opacity-50 group-hover:opacity-70 transition-opacity`} />
                 </div>
+                {/* 装饰性元素 */}
+                <div className="absolute inset-0 opacity-5" style={{
+                  backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
+                  backgroundSize: '16px 16px'
+                }} />
                 {template.isNew && (
                   <Badge className="absolute top-2 left-2 text-xs">新品</Badge>
                 )}
@@ -471,7 +504,7 @@ export default function TemplatesPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          )})}
         </div>
 
         {filteredTemplates.length === 0 && (

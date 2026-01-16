@@ -121,39 +121,39 @@ export function OnboardingChecklist({ className, onDismiss }: OnboardingChecklis
 
   return (
     <Card className={cn('border-dashed', className)}>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">入门指南</CardTitle>
+            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            <CardTitle className="text-sm sm:text-base">入门指南</CardTitle>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 -mr-2 -mt-2"
+            className="h-6 w-6 sm:h-8 sm:w-8 -mr-1 sm:-mr-2 -mt-1 sm:-mt-2"
             onClick={handleDismiss}
           >
-            <X className="h-4 w-4" />
+            <X className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </div>
-        <CardDescription>
+        <CardDescription className="text-xs sm:text-sm hidden sm:block">
           完成以下任务，快速熟悉 Thinkus 平台
         </CardDescription>
-        <div className="flex items-center gap-3 mt-2">
-          <Progress value={progress} className="h-2 flex-1" />
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            {completedItems.length} / {CHECKLIST_ITEMS.length}
+        <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2">
+          <Progress value={progress} className="h-1.5 sm:h-2 flex-1" />
+          <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
+            {completedItems.length}/{CHECKLIST_ITEMS.length}
           </span>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-1.5 sm:space-y-2 px-3 sm:px-6 pb-3 sm:pb-6">
         {CHECKLIST_ITEMS.map((item) => {
           const isCompleted = completedItems.includes(item.id)
           return (
             <div
               key={item.id}
               className={cn(
-                'flex items-center gap-3 p-3 rounded-lg transition-colors',
+                'flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg transition-colors',
                 isCompleted ? 'bg-muted/30' : 'bg-muted/50 hover:bg-muted'
               )}
             >
@@ -164,27 +164,27 @@ export function OnboardingChecklist({ className, onDismiss }: OnboardingChecklis
                 )}
               >
                 {isCompleted ? (
-                  <CheckCircle2 className="h-5 w-5" />
+                  <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
                 ) : (
-                  <Circle className="h-5 w-5" />
+                  <Circle className="h-4 w-4 sm:h-5 sm:w-5" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div
                   className={cn(
-                    'font-medium text-sm',
+                    'font-medium text-xs sm:text-sm',
                     isCompleted && 'line-through text-muted-foreground'
                   )}
                 >
                   {item.title}
                 </div>
-                <div className="text-xs text-muted-foreground truncate">
+                <div className="text-xs text-muted-foreground truncate hidden sm:block">
                   {item.description}
                 </div>
               </div>
               {!isCompleted && (
                 <Link href={item.href} onClick={() => markComplete(item.id)}>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="h-7 sm:h-8 px-2 sm:px-3 text-xs">
                     {item.action}
                   </Button>
                 </Link>

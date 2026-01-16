@@ -73,8 +73,19 @@ services:
     environment:
       - GRPC_PORT=50053
       - DATA_DIR=/data/sandboxes
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - claude-code-image
     privileged: true
     command: air -c .air.toml
+
+  # Claude Code 沙盒镜像 (预构建)
+  claude-code-image:
+    build:
+      context: ./services/go-sandbox/images/claude-code
+      dockerfile: Dockerfile
+    image: thinkus/claude-code:latest
+    command: ["echo", "Claude Code image built successfully"]
 
   # Redis
   redis:

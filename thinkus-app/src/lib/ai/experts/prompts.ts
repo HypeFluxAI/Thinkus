@@ -261,7 +261,15 @@ ${historyText}
       "description": "功能描述",
       "priority": "P0/P1/P2",
       "approved": true,
-      "expertNotes": "专家讨论中关于此功能的要点"
+      "expertNotes": "专家讨论中关于此功能的要点",
+      "includedInMvp": true
+    }
+  ],
+  "deferredFeatures": [
+    {
+      "name": "被推迟的功能名称",
+      "reason": "推迟原因（如：非核心功能、可后期迭代、依赖其他功能等）",
+      "suggestedPhase": "建议在哪个阶段实现（如：V1.1、V2.0）"
     }
   ],
   "techStack": {

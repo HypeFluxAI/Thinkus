@@ -34,6 +34,7 @@ import {
   Save,
   MessageCircle,
   Trash2,
+  Clock,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -64,10 +65,17 @@ interface PriceBreakdown {
   integrationTokens: number
 }
 
+interface DeferredFeature {
+  name: string
+  reason: string
+  suggestedPhase?: string
+}
+
 interface Proposal {
   projectName: string
   positioning: string
   features: Feature[]
+  deferredFeatures?: DeferredFeature[]
   techStack: {
     frontend: string[]
     backend: string[]
@@ -273,6 +281,37 @@ export default function ConfirmPage() {
     }
   }
 
+  // 测试模式：跳过支付直接进入开发阶段
+  const handleSkipPayment = async () => {
+    if (!proposal) return
+
+    setIsProcessing(true)
+    try {
+      // 创建一个测试项目
+      const response = await fetch('/api/projects/create-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposal }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        clearSession()
+        toast.success('测试项目创建成功！')
+        router.push(`/projects/${data.projectId}/progress`)
+      } else {
+        // 如果 API 不存在，直接跳转到成功页面
+        clearSession()
+        toast.success('跳过支付，进入测试模式')
+        router.push('/create/success?test=true')
+      }
+    } catch {
+      // 如果出错，直接跳转到成功页面
+      clearSession()
+      router.push('/create/success?test=true')
+    }
+  }
+
   if (!proposal) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -322,9 +361,16 @@ export default function ConfirmPage() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Project Header */}
         <div className="text-center mb-8">
-          <Badge variant="secondary" className="mb-4">
-            {proposal.features?.length || 0} 个功能
-          </Badge>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Badge variant="secondary">
+              MVP: {proposal.features?.length || 0} 个功能
+            </Badge>
+            {proposal.deferredFeatures && proposal.deferredFeatures.length > 0 && (
+              <Badge variant="outline" className="text-muted-foreground">
+                推迟: {proposal.deferredFeatures.length} 个
+              </Badge>
+            )}
+          </div>
           <h1 className="text-3xl font-bold mb-2">{proposal.projectName}</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">{proposal.positioning}</p>
         </div>
@@ -379,6 +425,16 @@ export default function ConfirmPage() {
                   <p className="text-xs text-center text-muted-foreground">
                     安全支付 · 不满意全额退款
                   </p>
+                  {/* 测试模式按钮 - 仅开发环境显示 */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSkipPayment}
+                    disabled={isProcessing}
+                    className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    跳过支付（测试）
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -514,6 +570,41 @@ export default function ConfirmPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Deferred Features */}
+          {proposal.deferredFeatures && proposal.deferredFeatures.length > 0 && (
+            <Card className="border-dashed border-muted-foreground/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="h-5 w-5" />
+                  推迟到后续版本的功能
+                </CardTitle>
+                <CardDescription>
+                  以下功能建议在 MVP 上线后根据用户反馈再实现
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {proposal.deferredFeatures.map((feature, index) => (
+                    <li key={index} className="flex items-start gap-3 text-muted-foreground">
+                      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 mt-2 shrink-0" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground">{feature.name}</span>
+                          {feature.suggestedPhase && (
+                            <Badge variant="outline" className="text-xs">
+                              {feature.suggestedPhase}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm mt-0.5">{feature.reason}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Tech Stack */}
           <Card>

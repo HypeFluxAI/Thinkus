@@ -11,6 +11,7 @@ export type StreamEventType =
   | 'message'           // 消息
   | 'file_change'       // 文件变更
   | 'sandbox_status'    // 沙盒状态
+  | 'ui_test_result'    // UI 测试结果
 
 /**
  * 基础事件
@@ -116,6 +117,23 @@ export interface MessageEvent extends StreamEvent {
     content: string
     agentId?: string
     agentName?: string
+  }
+}
+
+/**
+ * UI 测试结果事件
+ */
+export interface UITestResultEvent extends StreamEvent {
+  type: 'ui_test_result'
+  data: {
+    iteration: number
+    passed: boolean
+    results: {
+      testName: string
+      passed: boolean
+      score: number
+      issueCount: number
+    }[]
   }
 }
 
