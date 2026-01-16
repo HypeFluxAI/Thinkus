@@ -285,3 +285,51 @@ export {
   type ReminderConfig,
   type RenewalSummary,
 } from './renewal-reminder'
+
+// 自动化验收测试服务 (交付自动化 P0)
+export {
+  acceptanceTester,
+  AcceptanceTesterService,
+  type TestScenarioType,
+  type TestPriority,
+  type TestStepStatus,
+  type TestStep,
+  type TestScenario,
+  type AcceptanceTestReport,
+  type AcceptanceTestConfig,
+} from './acceptance-tester'
+
+// 交付自检清单服务 (交付自动化 P0)
+export {
+  deliveryChecklist,
+  DeliveryChecklistService,
+  type CheckCategory,
+  type CheckStatus,
+  type CheckImportance,
+  type ChecklistItem,
+  type DeliveryChecklist,
+  type ChecklistReport,
+} from './delivery-checklist'
+
+// 一键交付编排服务 (交付自动化 P0)
+export {
+  oneClickDelivery,
+  OneClickDeliveryService,
+  type DeliveryStage,
+  type StepStatus,
+  type DeliveryStep,
+  type DeliveryConfig,
+  type DeliveryResult,
+  type DeliveryOutput,
+} from './one-click-delivery'
+
+// 用户账号初始化服务 (交付自动化 P0)
+export {
+  userOnboarding,
+  UserOnboardingService,
+  type AccountType,
+  type NotificationChannel,
+  type PasswordStrength,
+  type UserAccount,
+  type OnboardingResult,
+} from './user-onboarding'
