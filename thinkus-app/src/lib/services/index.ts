@@ -333,3 +333,72 @@ export {
   type UserAccount,
   type OnboardingResult,
 } from './user-onboarding'
+
+// 用户活跃度追踪服务 (交付后跟踪 P0)
+export {
+  userActivityTracker,
+  UserActivityTrackerService,
+  type ActivityLevel,
+  type HealthStatus,
+  type UserActionType,
+  type UserAction,
+  type ActivityMetrics,
+  type UserHealthReport,
+  type RiskFactor,
+  type RecommendedAction,
+  type CareTrigger,
+  type CareRecord,
+  type ActivityTrackingConfig,
+} from './user-activity-tracker'
+
+// 持续运维自愈服务 (交付后跟踪 P0)
+export {
+  autoOps,
+  AutoOpsService,
+  type CheckType,
+  type CheckResultStatus,
+  type CheckResult,
+  type InspectionReport,
+  type Issue,
+  type AutoFixAttempt,
+  type Alert,
+  type HealingStrategy,
+  type HealingAction,
+  type HealingContext,
+  type HealingResult,
+  type ProjectOpsConfig,
+  type OpsDashboard,
+} from './auto-ops'
+
+// 内部交付看板服务 (交付后跟踪 P1)
+export {
+  deliveryDashboard,
+  DeliveryDashboardService,
+  type DeliveryPhase,
+  type Priority,
+  type SLAStatus,
+  type DeliveryProject,
+  type DeliveryTask,
+  type TeamMember,
+  type KanbanView,
+  type KanbanColumn,
+  type DashboardStats,
+  type TimelineEvent,
+  type DeliveryFilter,
+} from './delivery-dashboard'
+
+// 满意度收集服务 (交付后跟踪 P1)
+export {
+  satisfactionCollector,
+  SatisfactionCollectorService,
+  type RatingType,
+  type SatisfactionDimension,
+  type FeedbackStatus,
+  type NPSCategory,
+  type SatisfactionSurvey,
+  type SurveyResponse,
+  type SatisfactionStats,
+  type ImprovementSuggestion,
+  type SurveyTemplate,
+  type SurveyQuestion,
+} from './satisfaction-collector'
