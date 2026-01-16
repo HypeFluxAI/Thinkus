@@ -402,3 +402,75 @@ export {
   type SurveyTemplate,
   type SurveyQuestion,
 } from './satisfaction-collector'
+
+// 统一交付入口服务 (小白用户完整闭环 P0)
+export {
+  unifiedDelivery,
+  UnifiedDeliveryService,
+  type DeliveryFlowStage,
+  type StageStatus as DeliveryStageStatus,
+  type FlowStage,
+  type DeliveryFlowConfig,
+  type DeliveryFlowState,
+  type ProgressCallback,
+} from './unified-delivery'
+
+// 用户端状态页服务 (小白用户完整闭环 P0)
+export {
+  userStatusPage,
+  UserStatusPageService,
+  type ComponentStatus,
+  type StatusComponent,
+  type StatusIncident,
+  type IncidentUpdate,
+  type ScheduledMaintenance,
+  type UptimeDataPoint,
+  type StatusPageData,
+  type StatusPageConfig,
+} from './user-status-page'
+
+// 主动通知服务 (小白用户完整闭环 P0)
+export {
+  proactiveNotifier,
+  ProactiveNotifierService,
+  type NotificationType,
+  type NotificationPriority,
+  type NotificationChannel as ProactiveNotificationChannel,
+  type NotificationStatus,
+  type Notification,
+  type NotificationTemplate,
+  type NotificationPreferences,
+  type NotificationRule,
+  type NotificationTrigger,
+  type NotificationCondition,
+  type NotificationStats,
+} from './proactive-notifier'
+
+// 紧急联系通道服务 (小白用户完整闭环 P1)
+export {
+  emergencyContact,
+  EmergencyContactService,
+  type UrgencyLevel,
+  type ContactChannel,
+  type IssueCategory,
+  type EmergencyRequest,
+  type TimelineEvent as EmergencyTimelineEvent,
+  type SupportAgent,
+  type WorkingHours,
+  type SLAConfig,
+} from './emergency-contact'
+
+// 数据备份恢复服务 (小白用户完整闭环 P1)
+export {
+  dataBackup,
+  DataBackupService,
+  type BackupType,
+  type BackupStatus,
+  type RestoreStatus,
+  type BackupSchedule,
+  type StorageLocation,
+  type BackupRecord,
+  type RestoreRecord,
+  type BackupConfig,
+  type BackupStats,
+} from './data-backup'
