@@ -12,7 +12,7 @@ import { trpc } from '@/lib/trpc/client'
 import {
   Plus, Rocket, Clock, CheckCircle, LogOut, Sparkles,
   MessageSquare, Users, AlertTriangle, Target, TrendingUp,
-  Calendar, Settings, HelpCircle,
+  Calendar, Settings, HelpCircle, Cpu,
 } from 'lucide-react'
 import { EmptyState, emptyStatePresets } from '@/components/ui/empty-state'
 import { NotificationDropdown } from '@/components/notification'
@@ -113,6 +113,11 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <SearchTrigger />
+            <Link href="/ai-employees">
+              <Button variant="ghost" size="icon" title="AI 员工">
+                <Cpu className="h-4 w-4" />
+              </Button>
+            </Link>
             <Link href="/experts">
               <Button variant="ghost" size="icon" title="专家咨询">
                 <Users className="h-4 w-4" />
@@ -181,7 +186,25 @@ export default function DashboardPage() {
         </section>
 
         {/* Secondary Quick Actions */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Link href="/ai-employees">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer border-cyan-200 dark:border-cyan-900 bg-cyan-50/50 dark:bg-cyan-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+                      <Cpu className="h-5 w-5 text-cyan-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">AI 员工</h3>
+                      <p className="text-sm text-muted-foreground">与 AI 团队成员对话</p>
+                    </div>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
           <Link href="/ceo">
             <Card className="hover:shadow-md transition-shadow cursor-pointer border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20">
               <CardContent className="p-4">

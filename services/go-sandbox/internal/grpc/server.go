@@ -4,18 +4,18 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/thinkus/go-sandbox/internal/services"
+	pb "github.com/thinkus/go-sandbox/pkg/proto/sandbox"
 )
 
 // NewServer creates a new gRPC server with all services registered
 func NewServer() *grpc.Server {
 	server := grpc.NewServer()
 
-	// Register services
-	// Note: These will be registered after proto generation
-	// pb.RegisterSandboxServiceServer(server, services.NewSandboxService())
+	// Create service instance
+	sandboxService := services.NewSandboxService()
 
-	// For now, we'll use a placeholder
-	_ = services.NewSandboxService()
+	// Register gRPC service
+	pb.RegisterSandboxServiceServer(server, NewSandboxServicer(sandboxService))
 
 	return server
 }

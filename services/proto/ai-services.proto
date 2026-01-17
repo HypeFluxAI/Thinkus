@@ -192,10 +192,10 @@ message EscalateResponse {
 
 service AICareService {
   // 更新用户活动
-  rpc UpdateActivity(UpdateActivityRequest) returns (common.Empty);
+  rpc UpdateActivity(UpdateActivityRequest) returns (thinkus.Empty);
 
   // 记录卡住点
-  rpc RecordStuck(StuckRequest) returns (common.Empty);
+  rpc RecordStuck(StuckRequest) returns (thinkus.Empty);
 
   // 获取用户活动
   rpc GetActivity(GetActivityRequest) returns (UserActivity);

@@ -14,6 +14,10 @@ export * as analyticsService from './analytics'
 // Sandbox service (container management)
 export * as sandboxService from './sandbox'
 
+// AI Engine service (AI employees)
+export * as aiEngineService from './ai-engine'
+export { AI_ENGINE_URL } from './ai-engine'
+
 // Close all connections on process exit
 if (typeof process !== 'undefined') {
   process.on('beforeExit', () => {

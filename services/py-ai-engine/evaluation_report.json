@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-01-18T00:19:26.324599",
+  "total_tests": 9,
+  "passed_tests": 6,
+  "failed_tests": 3,
+  "pass_rate": 0.6666666666666666,
+  "avg_response_time_ms": 66367.43185255263,
+  "test_results": [
+    {
+      "name": "F1: Write Filtering",
+      "passed": true,
+      "duration_ms": 66033.60342979431,
+      "details": "High-value info saved, low-value filtered",
+      "error": null
+    },
+    {
+      "name": "F2: Retrieval Accuracy",
+      "passed": true,
+      "duration_ms": 55152.05883979797,
+      "details": "Found PostgreSQL: True",
+      "error": null
+    },
+    {
+      "name": "F3: Context Injection",
+      "passed": true,
+      "duration_ms": 58337.88323402405,
+      "details": "Memory influenced response",
+      "error": null
+    },
+    {
+      "name": "F9: Project Isolation",
+      "passed": true,
+      "duration_ms": 74670.40824890137,
+      "details": "Has BETA: False, Has ALPHA: False",
+      "error": null
+    },
+    {
+      "name": "Scenario: Preference Memory",
+      "passed": false,
+      "duration_ms": 64838.29092979431,
+      "details": "Preference not applied",
+      "error": null
+    },
+    {
+      "name": "Scenario: Fact Memory",
+      "passed": true,
+      "duration_ms": 55502.9022693634,
+      "details": "Has name: True, Has target: True",
+      "error": null
+    },
+    {
+      "name": "Scenario: Decision Memory",
+      "passed": false,
+      "duration_ms": 55394.29759979248,
+      "details": "Decision not remembered",
+      "error": null
+    },
+    {
+      "name": "Scenario: Low Value Filtering",
+      "passed": true,
+      "duration_ms": 91569.85831260681,
+      "details": "Low-value correctly filtered",
+      "error": null
+    },
+    {
+      "name": "Scenario: Information Update",
+      "passed": false,
+      "duration_ms": 75807.58380889893,
+      "details": "Vue: False, TS: False, React: True",
+      "error": null
+    }
+  ],
+  "recommendations": [
+    "Review corrector.py evidence detection logic"
+  ]
+}

@@ -22,6 +22,7 @@ services:
       - GRPC_PY_SERVICE_URL=py-service:50051
       - GRPC_ANALYTICS_URL=go-analytics:50052
       - GRPC_SANDBOX_URL=go-sandbox:50053
+      - GRPC_AI_ENGINE_URL=py-ai-engine:50054
       # AI 服务地址
       - AI_GUIDE_URL=http://py-ai-guide:8001
       - AI_SUPPORT_URL=http://py-ai-support:8002
@@ -30,6 +31,7 @@ services:
       - py-service
       - go-analytics
       - go-sandbox
+      - py-ai-engine
       - py-ai-guide
       - py-ai-support
       - go-ai-care
@@ -120,6 +122,36 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
+      retries: 3
+
+  # ============================================
+  # AI Employee Engine (核心AI服务)
+  # ============================================
+
+  # AI 员工引擎服务 (Python) - 虚拟AI高管
+  py-ai-engine:
+    build:
+      context: ./services
+      dockerfile: py-ai-engine/Dockerfile
+    ports:
+      - "50054:50054"  # gRPC
+      - "8010:8000"    # HTTP
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
+      - GRPC_PORT=50054
+      - PORT=8000
+      - AI_MODEL=claude-sonnet-4-20250514
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
       retries: 3
 
   # ============================================

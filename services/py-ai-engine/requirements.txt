@@ -1,0 +1,30 @@
+# FastAPI and server
+fastapi==0.115.6
+uvicorn==0.34.0
+python-multipart==0.0.18
+
+# gRPC
+grpcio==1.68.1
+grpcio-tools==1.68.1
+protobuf==5.29.2
+
+# AI
+anthropic==0.42.0
+openai==1.58.1
+
+# Vector database
+pinecone==5.0.1
+
+# Database
+motor==3.6.0
+pymongo==4.9.2
+redis==5.2.1
+
+# Utils
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+httpx==0.28.1
+
+# Async
+aiofiles==24.1.0

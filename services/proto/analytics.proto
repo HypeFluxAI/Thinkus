@@ -4,7 +4,7 @@ package thinkus.analytics;
 
 import "common.proto";
 
-option go_package = "github.com/thinkus/services/pkg/proto/analytics";
+option go_package = "github.com/thinkus/go-analytics/pkg/proto/analytics";
 
 // 分析服务
 service AnalyticsService {

@@ -71,21 +71,22 @@ thinkus/
 ├── thinkus-app/src/
 │   ├── app/              # Next.js App Router
 │   │   ├── (auth)/       # 认证页面
-│   │   ├── (main)/       # 主要页面
+│   │   ├── (main)/       # 主要页面 (含 ai-employees/)
 │   │   └── api/          # API路由
-│   ├── components/       # React组件
+│   ├── components/       # React组件 (含 ai-employee/)
 │   ├── lib/              # 核心库
 │   │   ├── trpc/         # tRPC配置
 │   │   ├── db/           # 数据库模型
 │   │   ├── ai/           # AI相关
+│   │   ├── grpc/         # gRPC客户端
 │   │   └── services/     # 业务服务
 │   ├── hooks/            # React hooks
 │   └── types/            # 类型定义
 ├── services/
-│   ├── py-*/             # Python微服务
+│   ├── py-ai-engine/     # AI员工引擎 (核心服务)
+│   ├── py-*/             # 其他Python微服务
 │   └── go-*/             # Go微服务
-├── thinkus-v12-docs/     # 项目文档
-│   └── v13-specs/        # v13功能规格 (13个模块文档)
+├── v13-specs/            # v13功能规格 (13个模块文档)
 └── CLAUDE.md             # 本文件
 ```
 
@@ -183,10 +184,85 @@ R2_BUCKET_NAME=thinkus-artifacts
 
 ---
 
+## AI员工引擎 (py-ai-engine)
+
+**核心服务**: `services/py-ai-engine/` - 所有AI员工的后端引擎
+
+### 架构
+
+```
+services/py-ai-engine/src/
+├── main.py              # FastAPI入口 (HTTP: 8016)
+├── employees/           # AI员工实现
+│   ├── base.py          # BaseEmployee基类
+│   ├── mike_pm.py       # Mike - 产品经理
+│   ├── david_tech.py    # David - 技术总监
+│   └── ...              # 其他员工
+└── memory/              # 记忆系统 (核心)
+    ├── manager.py       # 统一管理器
+    ├── models.py        # 数据模型
+    ├── scorer.py        # 4维评分过滤
+    ├── retriever.py     # 两阶段检索
+    ├── corrector.py     # 冲突检测与修正
+    ├── injector.py      # 上下文注入
+    ├── cache.py         # Redis缓存层
+    ├── shared.py        # 跨员工共享
+    ├── deduplicator.py  # 语义去重
+    ├── tier_adjuster.py # 动态Tier调整
+    ├── chain.py         # 记忆链追踪
+    └── maintenance.py   # 后台维护服务
+```
+
+### 记忆系统关键概念
+
+```yaml
+4维评分过滤:
+  - repeatability: 是否重复出现
+  - persistence: 是否长期有效
+  - relevance: 与项目相关性
+  - decision_value: 决策价值
+  - 评分≥2/4才保存
+
+记忆Tier:
+  - CORE: 核心记忆，始终注入 (10%)
+  - RELEVANT: 相关记忆，按需注入 (30%)
+  - COLD: 冷存储，很少使用 (60%)
+
+两阶段检索:
+  1. Directory阶段: 摘要匹配，获取候选
+  2. Detail阶段: 全文获取，精确匹配
+
+冲突处理:
+  - 检测: 模式匹配 + LLM判断
+  - 处理: 降权旧记忆，标记[OUTDATED]
+```
+
+### 环境变量 (py-ai-engine)
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...    # Claude API
+OPENAI_API_KEY=sk-...           # Embeddings
+PINECONE_API_KEY=...            # 向量数据库
+PINECONE_INDEX_NAME=thinkus-memory
+REDIS_URL=redis://localhost:6379
+MEMORY_ENABLED=true
+```
+
+### 运行服务
+
+```bash
+cd services/py-ai-engine
+pip install -r requirements.txt
+python src/main.py  # HTTP: 8016
+```
+
+---
+
 ## 更新日志
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-18 | 5.0.0 | AI员工记忆系统完整实现: Redis缓存、跨员工共享、语义去重、动态Tier、记忆链追踪、后台维护 |
 | 2026-01-17 | 4.0.0 | 压缩CLAUDE.md: 移除冗余内容,保留核心规范,详细规格移至v13-specs |
 | 2026-01-17 | 3.9.0 | 拆分v13功能规格为13个独立模块文档(v13-specs/) |
 | 2026-01-17 | 3.8.0 | 创建v13完整功能需求规格文档 |

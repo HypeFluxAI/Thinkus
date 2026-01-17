@@ -1,0 +1,18 @@
+[project]
+name = "py-ai-engine"
+version = "1.0.0"
+description = "AI Employee Engine Service for Thinkus Platform"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]

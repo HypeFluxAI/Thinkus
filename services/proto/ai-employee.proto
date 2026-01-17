@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package thinkus.aiemployee;
+
+option go_package = "github.com/thinkus/services/pkg/proto/aiemployee";
+
+// AI Employee Service - Virtual executives for product development
+service AIEmployeeService {
+  // Chat with an AI employee
+  rpc Chat(ChatRequest) returns (ChatResponse);
+
+  // Chat with streaming response
+  rpc ChatStream(ChatRequest) returns (stream ChatChunk);
+
+  // Get employee information
+  rpc GetEmployee(GetEmployeeRequest) returns (Employee);
+
+  // List all available employees
+  rpc ListEmployees(ListEmployeesRequest) returns (ListEmployeesResponse);
+
+  // Start a discussion session with multiple employees
+  rpc StartDiscussion(StartDiscussionRequest) returns (DiscussionResponse);
+
+  // Add message to discussion
+  rpc AddToDiscussion(AddToDiscussionRequest) returns (DiscussionResponse);
+
+  // Get discussion history
+  rpc GetDiscussion(GetDiscussionRequest) returns (Discussion);
+}
+
+message ChatRequest {
+  string employee_id = 1;
+  string project_id = 2;
+  string user_id = 3;
+  string message = 4;
+  repeated Message context = 5;
+  map<string, string> metadata = 6;
+}
+
+message ChatResponse {
+  string employee_id = 1;
+  string message = 2;
+  repeated string suggestions = 3;
+  repeated Artifact artifacts = 4;
+  double confidence = 5;
+  int32 tokens_used = 6;
+}
+
+message ChatChunk {
+  string content = 1;
+  bool is_done = 2;
+  optional ChatResponse final_response = 3;
+}
+
+message Message {
+  string role = 1;
+  string content = 2;
+  string employee_id = 3;
+  int64 timestamp = 4;
+}
+
+message Artifact {
+  string type = 1;      // code, diagram, document, checklist
+  string title = 2;
+  string content = 3;
+  string language = 4;  // for code artifacts
+}
+
+message GetEmployeeRequest {
+  string employee_id = 1;
+}
+
+message Employee {
+  string id = 1;
+  string name = 2;
+  string title = 3;
+  string department = 4;
+  string avatar = 5;
+  string description = 6;
+  repeated string capabilities = 7;
+  repeated string specialties = 8;
+  string personality = 9;
+  bool is_available = 10;
+}
+
+message ListEmployeesRequest {
+  optional string department = 1;
+}
+
+message ListEmployeesResponse {
+  repeated Employee employees = 1;
+}
+
+message StartDiscussionRequest {
+  string project_id = 1;
+  string user_id = 2;
+  string topic = 3;
+  repeated string employee_ids = 4;
+  string initial_message = 5;
+}
+
+message AddToDiscussionRequest {
+  string discussion_id = 1;
+  string message = 2;
+  optional string target_employee_id = 3;
+}
+
+message GetDiscussionRequest {
+  string discussion_id = 1;
+}
+
+message Discussion {
+  string id = 1;
+  string project_id = 2;
+  string topic = 3;
+  repeated string participant_ids = 4;
+  repeated DiscussionMessage messages = 5;
+  string status = 6;  // active, concluded, paused
+  int64 created_at = 7;
+  int64 updated_at = 8;
+}
+
+message DiscussionMessage {
+  string id = 1;
+  string employee_id = 2;
+  string employee_name = 3;
+  string content = 4;
+  repeated Artifact artifacts = 5;
+  int64 timestamp = 6;
+}
+
+message DiscussionResponse {
+  Discussion discussion = 1;
+  repeated DiscussionMessage new_messages = 2;
+}

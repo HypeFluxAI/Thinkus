@@ -514,7 +514,7 @@ type AgentId =
   | 'nancy_sales'    // 销售专家
   | 'oscar_bd'       // 商务拓展
   | 'paul_pr'        // 公关专家
-  | 'quinn_hr'       // HR专家
+  | 'quinn_ops'      // 运营专家
 
   // 特殊角色
   | 'librarian';     // 知识管理员
