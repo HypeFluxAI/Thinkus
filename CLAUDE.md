@@ -121,11 +121,11 @@ thinkus/
 
 ```yaml
 核心文档:
-  - thinkus-v12-docs/v13-specs/README.md  # v13功能规格索引
+  - v13-specs/README.md  # v13功能规格索引
   - thinkus-v12-docs/INDEX.md             # 文档索引
   - thinkus-v12-docs/PRD.md               # 产品需求
 
-v13功能规格 (thinkus-v12-docs/v13-specs/):
+v13功能规格 (v13-specs/):
   - 00-overview.md      # 项目概览
   - 01-architecture.md  # 三层架构
   - 02-ai-executives.md # 18位AI高管
@@ -188,7 +188,7 @@ R2_BUCKET_NAME=thinkus-artifacts
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
 | 2026-01-17 | 4.0.0 | 压缩CLAUDE.md: 移除冗余内容,保留核心规范,详细规格移至v13-specs |
-| 2026-01-17 | 3.9.0 | 拆分v13功能规格为13个独立模块文档(thinkus-v12-docs/v13-specs/) |
+| 2026-01-17 | 3.9.0 | 拆分v13功能规格为13个独立模块文档(v13-specs/) |
 | 2026-01-17 | 3.8.0 | 创建v13完整功能需求规格文档 |
 | 2026-01-17 | 3.7.x | 交付系统完善、需求模板、微服务架构 |
 | 2026-01-16 | 3.6.x | 交付系统UI组件、SSE实时推送 |
