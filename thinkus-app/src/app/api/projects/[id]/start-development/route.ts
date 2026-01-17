@@ -54,8 +54,10 @@ export async function POST(
           message: '开发已在进行中',
           session: {
             status: existingSession.status,
-            progress: Math.round((existingSession.currentTaskIndex / existingSession.tasks.length) * 100),
-            currentTask: existingSession.tasks[existingSession.currentTaskIndex]?.filePath,
+            progress: existingSession.featureResults.length > 0
+              ? Math.round((existingSession.currentFeatureIndex / existingSession.featureResults.length) * 100)
+              : 0,
+            currentFeature: existingSession.featureResults[existingSession.currentFeatureIndex]?.featureName,
           },
         })
       }
@@ -155,24 +157,25 @@ export async function GET(
       })
     }
 
-    const completedTasks = devSession.tasks.filter(t => t.status === 'completed').length
-    const totalTasks = devSession.tasks.length
-    const progress = Math.round((completedTasks / totalTasks) * 100)
+    const completedFeatures = devSession.featureResults.filter(f => f.status === 'completed' || f.status === 'degraded').length
+    const totalFeatures = devSession.featureResults.length
+    const progress = totalFeatures > 0 ? Math.round((completedFeatures / totalFeatures) * 100) : 0
 
     return NextResponse.json({
       status: devSession.status,
       progress,
-      currentTaskIndex: devSession.currentTaskIndex,
-      currentTask: devSession.tasks[devSession.currentTaskIndex]?.filePath,
-      totalTasks,
-      completedTasks,
+      currentFeatureIndex: devSession.currentFeatureIndex,
+      currentFeature: devSession.featureResults[devSession.currentFeatureIndex]?.featureName,
+      totalFeatures,
+      completedFeatures,
       startedAt: devSession.startedAt,
       completedAt: devSession.completedAt,
-      tasks: devSession.tasks.map(t => ({
-        id: t.id,
-        filePath: t.filePath,
-        status: t.status,
-        featureName: t.featureName,
+      features: devSession.featureResults.map(f => ({
+        id: f.featureId,
+        name: f.featureName,
+        status: f.status,
+        score: f.score,
+        priority: f.priority,
       })),
     })
 

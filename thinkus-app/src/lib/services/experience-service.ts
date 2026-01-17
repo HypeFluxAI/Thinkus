@@ -219,8 +219,12 @@ export class ExperienceService {
         name: project.name,
         description: project.description,
         category: this.mapProjectCategory(project.type),
-        techStack: project.techStack || [],
-        features: project.features?.map(f => f.name) || [],
+        techStack: [
+          ...(project.proposal?.techStack?.frontend || []),
+          ...(project.proposal?.techStack?.backend || []),
+          ...(project.proposal?.techStack?.database || [])
+        ],
+        features: project.proposal?.features?.map(f => f.name) || [],
       })
 
       if (projectExp) {
@@ -229,8 +233,9 @@ export class ExperienceService {
 
       // 3. 收集模块级经验 (如果有)
       // 这里可以根据项目的功能列表生成模块经验
-      if (project.features && project.features.length > 0) {
-        for (const feature of project.features.slice(0, 5)) { // 最多收集5个
+      const features = project.proposal?.features
+      if (features && features.length > 0) {
+        for (const feature of features.slice(0, 5)) { // 最多收集5个
           const moduleExp = await this.add({
             projectId,
             userId,
@@ -238,7 +243,11 @@ export class ExperienceService {
             name: feature.name,
             description: feature.description || feature.name,
             category: this.mapProjectCategory(project.type),
-            techStack: project.techStack || [],
+            techStack: [
+              ...(project.proposal?.techStack?.frontend || []),
+              ...(project.proposal?.techStack?.backend || []),
+              ...(project.proposal?.techStack?.database || [])
+            ],
             features: [feature.name],
           })
 

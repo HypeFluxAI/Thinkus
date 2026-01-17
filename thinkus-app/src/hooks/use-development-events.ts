@@ -36,6 +36,7 @@ export interface ProgressData {
   subTasks?: {
     name: string
     status: 'pending' | 'running' | 'done' | 'error'
+    error?: string  // 错误信息（当 status 为 'error' 时）
   }[]
 }
 

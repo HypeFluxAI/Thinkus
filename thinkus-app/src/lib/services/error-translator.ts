@@ -1,349 +1,354 @@
 /**
  * 错误翻译服务
- * 将技术错误信息翻译为小白用户能理解的人话
+ * 将技术错误翻译为小白用户能理解的人话
  */
 
 import {
   FRIENDLY_ERRORS,
   FriendlyError,
-  ErrorSeverity,
   ErrorCategory,
+  ErrorSeverity,
+  SEVERITY_CONFIG,
   ERROR_CATEGORY_LABELS,
-  SEVERITY_CONFIG
-} from '../errors/friendly-errors'
+} from '@/lib/errors/friendly-errors'
 
-/**
- * 翻译后的错误信息
- */
 export interface TranslatedError {
   /** 原始错误信息 */
-  originalMessage: string
-  /** 匹配到的错误定义 */
-  error: FriendlyError
-  /** 是否匹配到具体错误（非兜底） */
-  isKnownError: boolean
-  /** 重试配置 */
-  retryConfig: RetryConfig | null
-  /** 错误发生时间 */
-  timestamp: Date
+  original: string
+  /** 匹配的友好错误 */
+  friendly: FriendlyError
+  /** 是否找到匹配 */
+  matched: boolean
+  /** 翻译时间 */
+  translatedAt: Date
 }
 
-/**
- * 重试配置
- */
 export interface RetryConfig {
-  /** 是否可以重试 */
+  /** 是否可重试 */
   canRetry: boolean
-  /** 重试等待时间（秒） */
-  retryDelay: number
+  /** 重试延迟(秒) */
+  delay: number
   /** 最大重试次数 */
   maxRetries: number
   /** 当前重试次数 */
   currentRetry: number
 }
 
-/**
- * 错误统计
- */
-export interface ErrorStats {
-  /** 错误分类统计 */
-  byCategory: Record<ErrorCategory, number>
-  /** 严重程度统计 */
-  bySeverity: Record<ErrorSeverity, number>
-  /** 总错误数 */
-  total: number
-  /** 可重试错误数 */
-  retryable: number
+export interface ErrorHistory {
+  /** 错误代码 */
+  code: string
+  /** 发生次数 */
+  count: number
+  /** 首次发生 */
+  firstOccurred: Date
+  /** 最后发生 */
+  lastOccurred: Date
 }
 
 /**
  * 错误翻译服务类
  */
 export class ErrorTranslatorService {
-  private static instance: ErrorTranslatorService
-
-  /** 错误历史记录（用于统计和分析） */
-  private errorHistory: TranslatedError[] = []
-
-  /** 最大历史记录数 */
-  private readonly MAX_HISTORY = 100
-
-  /** 重试计数器（按错误代码） */
+  private errorHistory: Map<string, ErrorHistory> = new Map()
   private retryCounters: Map<string, number> = new Map()
 
-  private constructor() {}
-
-  public static getInstance(): ErrorTranslatorService {
-    if (!ErrorTranslatorService.instance) {
-      ErrorTranslatorService.instance = new ErrorTranslatorService()
-    }
-    return ErrorTranslatorService.instance
-  }
-
   /**
-   * 翻译错误信息
-   * @param error 原始错误（可以是 Error 对象、字符串或任意对象）
-   * @returns 翻译后的错误信息
+   * 将技术错误翻译为人话
    */
-  translateError(error: unknown): TranslatedError {
-    const errorMessage = this.extractErrorMessage(error)
-    const matchedError = this.findMatchingError(errorMessage)
-    const isKnownError = matchedError.code !== 'UNKNOWN_ERROR'
+  translateError(errorMessage: string): TranslatedError {
+    const normalizedMessage = errorMessage.toLowerCase()
 
-    const currentRetry = this.retryCounters.get(matchedError.code) || 0
+    // 遍历所有友好错误定义，找到匹配的
+    for (const friendlyError of FRIENDLY_ERRORS) {
+      const pattern = typeof friendlyError.pattern === 'string'
+        ? new RegExp(friendlyError.pattern, 'i')
+        : friendlyError.pattern
 
-    const retryConfig: RetryConfig | null = matchedError.canRetry ? {
-      canRetry: currentRetry < (matchedError.maxRetries || 1),
-      retryDelay: matchedError.retryDelay || 30,
-      maxRetries: matchedError.maxRetries || 1,
-      currentRetry
-    } : null
+      if (pattern.test(normalizedMessage)) {
+        // 记录错误历史
+        this.recordError(friendlyError.code)
 
-    const translated: TranslatedError = {
-      originalMessage: errorMessage,
-      error: matchedError,
-      isKnownError,
-      retryConfig,
-      timestamp: new Date()
-    }
-
-    // 记录到历史
-    this.addToHistory(translated)
-
-    return translated
-  }
-
-  /**
-   * 从各种错误格式中提取错误信息
-   */
-  private extractErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message
-    }
-    if (typeof error === 'string') {
-      return error
-    }
-    if (error && typeof error === 'object') {
-      // 尝试常见的错误对象格式
-      const obj = error as Record<string, unknown>
-      if (obj.message && typeof obj.message === 'string') {
-        return obj.message
-      }
-      if (obj.error && typeof obj.error === 'string') {
-        return obj.error
-      }
-      if (obj.error && typeof obj.error === 'object') {
-        const innerError = obj.error as Record<string, unknown>
-        if (innerError.message && typeof innerError.message === 'string') {
-          return innerError.message
-        }
-      }
-      // 返回 JSON 字符串
-      try {
-        return JSON.stringify(error)
-      } catch {
-        return String(error)
-      }
-    }
-    return String(error)
-  }
-
-  /**
-   * 查找匹配的错误定义
-   */
-  private findMatchingError(errorMessage: string): FriendlyError {
-    // 遍历所有错误定义（除了最后一个兜底错误）
-    for (let i = 0; i < FRIENDLY_ERRORS.length - 1; i++) {
-      const friendlyError = FRIENDLY_ERRORS[i]
-      const pattern = friendlyError.pattern
-
-      if (typeof pattern === 'string') {
-        if (errorMessage.toLowerCase().includes(pattern.toLowerCase())) {
-          return friendlyError
-        }
-      } else if (pattern instanceof RegExp) {
-        if (pattern.test(errorMessage)) {
-          return friendlyError
+        return {
+          original: errorMessage,
+          friendly: friendlyError,
+          matched: true,
+          translatedAt: new Date(),
         }
       }
     }
 
-    // 返回兜底错误
-    return FRIENDLY_ERRORS[FRIENDLY_ERRORS.length - 1]
-  }
+    // 没有找到匹配，使用最后一个（通用错误）
+    const fallback = FRIENDLY_ERRORS[FRIENDLY_ERRORS.length - 1]
+    this.recordError(fallback.code)
 
-  /**
-   * 记录重试
-   */
-  recordRetry(errorCode: string): void {
-    const current = this.retryCounters.get(errorCode) || 0
-    this.retryCounters.set(errorCode, current + 1)
-  }
-
-  /**
-   * 重置重试计数
-   */
-  resetRetry(errorCode: string): void {
-    this.retryCounters.delete(errorCode)
-  }
-
-  /**
-   * 重置所有重试计数
-   */
-  resetAllRetries(): void {
-    this.retryCounters.clear()
+    return {
+      original: errorMessage,
+      friendly: fallback,
+      matched: false,
+      translatedAt: new Date(),
+    }
   }
 
   /**
    * 获取重试配置
    */
-  getRetryConfig(errorCode: string): RetryConfig | null {
-    const errorDef = FRIENDLY_ERRORS.find(e => e.code === errorCode)
-    if (!errorDef || !errorDef.canRetry) {
-      return null
+  getRetryConfig(errorCode: string): RetryConfig {
+    const friendlyError = FRIENDLY_ERRORS.find(e => e.code === errorCode)
+    const currentRetry = this.retryCounters.get(errorCode) || 0
+
+    if (!friendlyError || !friendlyError.canRetry) {
+      return {
+        canRetry: false,
+        delay: 0,
+        maxRetries: 0,
+        currentRetry,
+      }
     }
 
-    const currentRetry = this.retryCounters.get(errorCode) || 0
+    const maxRetries = friendlyError.maxRetries || 3
+    const canRetry = currentRetry < maxRetries
+
     return {
-      canRetry: currentRetry < (errorDef.maxRetries || 1),
-      retryDelay: errorDef.retryDelay || 30,
-      maxRetries: errorDef.maxRetries || 1,
-      currentRetry
+      canRetry,
+      delay: friendlyError.retryDelay || 10,
+      maxRetries,
+      currentRetry,
     }
   }
 
   /**
    * 判断是否应该自动重试
    */
-  shouldAutoRetry(error: unknown): boolean {
-    const translated = this.translateError(error)
-    return translated.retryConfig?.canRetry ?? false
+  shouldAutoRetry(errorCode: string): boolean {
+    const config = this.getRetryConfig(errorCode)
+    return config.canRetry && config.currentRetry < config.maxRetries
   }
 
   /**
-   * 获取错误统计
+   * 增加重试计数
    */
-  getErrorStats(): ErrorStats {
-    const stats: ErrorStats = {
-      byCategory: {
-        network: 0,
-        database: 0,
-        deployment: 0,
-        auth: 0,
-        payment: 0,
-        api: 0,
-        build: 0,
-        resource: 0,
-        config: 0,
-        unknown: 0
-      },
-      bySeverity: {
-        info: 0,
-        warning: 0,
-        error: 0,
-        fatal: 0
-      },
-      total: this.errorHistory.length,
-      retryable: 0
-    }
-
-    for (const error of this.errorHistory) {
-      stats.byCategory[error.error.category]++
-      stats.bySeverity[error.error.severity]++
-      if (error.retryConfig?.canRetry) {
-        stats.retryable++
-      }
-    }
-
-    return stats
+  incrementRetryCount(errorCode: string): number {
+    const current = this.retryCounters.get(errorCode) || 0
+    const newCount = current + 1
+    this.retryCounters.set(errorCode, newCount)
+    return newCount
   }
 
   /**
-   * 获取最近的错误
+   * 重置重试计数
    */
-  getRecentErrors(count: number = 10): TranslatedError[] {
-    return this.errorHistory.slice(-count)
+  resetRetryCount(errorCode: string): void {
+    this.retryCounters.delete(errorCode)
   }
 
   /**
-   * 清除错误历史
+   * 判断是否是致命错误（不可恢复）
    */
-  clearHistory(): void {
-    this.errorHistory = []
+  isFatalError(errorCode: string): boolean {
+    const friendlyError = FRIENDLY_ERRORS.find(e => e.code === errorCode)
+    return friendlyError?.severity === 'fatal'
   }
 
   /**
-   * 添加到历史记录
+   * 获取错误的严重程度
    */
-  private addToHistory(error: TranslatedError): void {
-    this.errorHistory.push(error)
-    // 保持历史记录在最大限制内
-    if (this.errorHistory.length > this.MAX_HISTORY) {
-      this.errorHistory.shift()
-    }
+  getSeverity(errorCode: string): ErrorSeverity {
+    const friendlyError = FRIENDLY_ERRORS.find(e => e.code === errorCode)
+    return friendlyError?.severity || 'error'
   }
 
   /**
-   * 获取错误分类的人话标签
+   * 获取错误分类
+   */
+  getCategory(errorCode: string): ErrorCategory {
+    const friendlyError = FRIENDLY_ERRORS.find(e => e.code === errorCode)
+    return friendlyError?.category || 'unknown'
+  }
+
+  /**
+   * 获取错误分类的人话描述
    */
   getCategoryLabel(category: ErrorCategory): string {
-    return ERROR_CATEGORY_LABELS[category]
+    return ERROR_CATEGORY_LABELS[category] || '其他问题'
   }
 
   /**
-   * 获取严重程度的配置
+   * 获取严重程度的样式配置
    */
   getSeverityConfig(severity: ErrorSeverity) {
     return SEVERITY_CONFIG[severity]
   }
 
   /**
+   * 记录错误历史
+   */
+  private recordError(code: string): void {
+    const now = new Date()
+    const existing = this.errorHistory.get(code)
+
+    if (existing) {
+      existing.count++
+      existing.lastOccurred = now
+    } else {
+      this.errorHistory.set(code, {
+        code,
+        count: 1,
+        firstOccurred: now,
+        lastOccurred: now,
+      })
+    }
+  }
+
+  /**
+   * 获取错误历史
+   */
+  getErrorHistory(): ErrorHistory[] {
+    return Array.from(this.errorHistory.values())
+  }
+
+  /**
+   * 获取指定错误的历史
+   */
+  getErrorHistoryByCode(code: string): ErrorHistory | undefined {
+    return this.errorHistory.get(code)
+  }
+
+  /**
+   * 清除错误历史
+   */
+  clearErrorHistory(): void {
+    this.errorHistory.clear()
+    this.retryCounters.clear()
+  }
+
+  /**
+   * 获取错误统计
+   */
+  getErrorStats(): {
+    totalErrors: number
+    byCategory: Record<ErrorCategory, number>
+    bySeverity: Record<ErrorSeverity, number>
+    topErrors: Array<{ code: string; count: number }>
+  } {
+    const byCategory: Record<ErrorCategory, number> = {
+      network: 0,
+      database: 0,
+      deployment: 0,
+      auth: 0,
+      payment: 0,
+      api: 0,
+      build: 0,
+      resource: 0,
+      config: 0,
+      unknown: 0,
+    }
+
+    const bySeverity: Record<ErrorSeverity, number> = {
+      info: 0,
+      warning: 0,
+      error: 0,
+      fatal: 0,
+    }
+
+    let totalErrors = 0
+    const errorCounts: Array<{ code: string; count: number }> = []
+
+    this.errorHistory.forEach((history, code) => {
+      totalErrors += history.count
+      errorCounts.push({ code, count: history.count })
+
+      const friendlyError = FRIENDLY_ERRORS.find(e => e.code === code)
+      if (friendlyError) {
+        byCategory[friendlyError.category] = (byCategory[friendlyError.category] || 0) + history.count
+        bySeverity[friendlyError.severity] = (bySeverity[friendlyError.severity] || 0) + history.count
+      }
+    })
+
+    // 排序获取top错误
+    errorCounts.sort((a, b) => b.count - a.count)
+    const topErrors = errorCounts.slice(0, 10)
+
+    return {
+      totalErrors,
+      byCategory,
+      bySeverity,
+      topErrors,
+    }
+  }
+
+  /**
    * 生成用户友好的错误摘要
-   * 用于发送给客服或技术支持
    */
-  generateErrorSummary(error: TranslatedError): string {
-    const lines = [
-      `【错误报告】`,
-      `时间: ${error.timestamp.toLocaleString('zh-CN')}`,
-      `类型: ${this.getCategoryLabel(error.error.category)}`,
-      `代码: ${error.error.code}`,
-      `描述: ${error.error.title} - ${error.error.description}`,
-      `原始信息: ${error.originalMessage.substring(0, 200)}`,
-      `是否可重试: ${error.retryConfig?.canRetry ? '是' : '否'}`,
-      error.retryConfig ? `重试次数: ${error.retryConfig.currentRetry}/${error.retryConfig.maxRetries}` : ''
-    ].filter(Boolean)
+  generateUserSummary(errorMessage: string): string {
+    const translated = this.translateError(errorMessage)
+    const { friendly } = translated
 
-    return lines.join('\n')
+    return \`\${friendly.icon} \${friendly.title}\n\${friendly.description}\n\n建议: \${friendly.suggestion}\`
   }
 
   /**
-   * 批量翻译错误
+   * 生成错误报告（用于客服）
    */
-  translateErrors(errors: unknown[]): TranslatedError[] {
-    return errors.map(error => this.translateError(error))
-  }
+  generateSupportReport(errorMessage: string): {
+    userFriendly: string
+    technical: string
+    suggestions: string[]
+    canAutoFix: boolean
+  } {
+    const translated = this.translateError(errorMessage)
+    const { friendly, original } = translated
 
-  /**
-   * 检查是否是致命错误（不应重试）
-   */
-  isFatalError(error: unknown): boolean {
-    const translated = this.translateError(error)
-    return translated.error.severity === 'fatal'
-  }
+    const suggestions: string[] = [friendly.suggestion]
 
-  /**
-   * 获取建议的等待时间（基于错误类型）
-   */
-  getSuggestedWaitTime(error: unknown): number {
-    const translated = this.translateError(error)
-    return translated.retryConfig?.retryDelay || 30
+    if (friendly.canRetry) {
+      suggestions.push(\`可以\${friendly.retryDelay}秒后自动重试\`)
+    }
+
+    if (friendly.severity === 'fatal') {
+      suggestions.push('需要技术支持介入')
+    }
+
+    return {
+      userFriendly: \`\${friendly.title}: \${friendly.description}\`,
+      technical: \`[\${friendly.code}] \${original}\`,
+      suggestions,
+      canAutoFix: friendly.canRetry && friendly.severity !== 'fatal',
+    }
   }
 }
 
-// 导出单例实例
-export const errorTranslator = ErrorTranslatorService.getInstance()
+// 单例实例
+let errorTranslatorInstance: ErrorTranslatorService | null = null
 
-// 导出便捷方法
-export const translateError = (error: unknown) => errorTranslator.translateError(error)
-export const shouldAutoRetry = (error: unknown) => errorTranslator.shouldAutoRetry(error)
-export const isFatalError = (error: unknown) => errorTranslator.isFatalError(error)
+/**
+ * 获取错误翻译服务实例
+ */
+export function getErrorTranslator(): ErrorTranslatorService {
+  if (!errorTranslatorInstance) {
+    errorTranslatorInstance = new ErrorTranslatorService()
+  }
+  return errorTranslatorInstance
+}
+
+/**
+ * 快捷方法：翻译错误
+ */
+export function translateError(errorMessage: string): TranslatedError {
+  return getErrorTranslator().translateError(errorMessage)
+}
+
+/**
+ * 快捷方法：判断是否应该自动重试
+ */
+export function shouldAutoRetry(errorCode: string): boolean {
+  return getErrorTranslator().shouldAutoRetry(errorCode)
+}
+
+/**
+ * 快捷方法：判断是否是致命错误
+ */
+export function isFatalError(errorCode: string): boolean {
+  return getErrorTranslator().isFatalError(errorCode)
+}
+
+export default ErrorTranslatorService

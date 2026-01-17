@@ -40,7 +40,7 @@ export function UserStatusPanel({
   const loadStatus = useCallback(async () => {
     setLoading(true)
     try {
-      const data = userStatusPage.getStatusPage(projectId)
+      const data = await userStatusPage.getStatusPage(projectId)
       setStatusData(data)
     } catch (error) {
       console.error('加载状态数据失败:', error)
@@ -376,12 +376,15 @@ export function StatusBadgeMini({
   const [status, setStatus] = useState<ComponentStatus>('operational')
 
   useEffect(() => {
-    try {
-      const data = userStatusPage.getStatusPage(projectId)
-      setStatus(data.overallStatus)
-    } catch {
-      // 忽略错误
+    const loadStatus = async () => {
+      try {
+        const data = await userStatusPage.getStatusPage(projectId)
+        setStatus(data.overallStatus)
+      } catch {
+        // 忽略错误
+      }
     }
+    loadStatus()
   }, [projectId])
 
   const statusConfig = userStatusPage.getComponentStatusConfig()
@@ -413,12 +416,15 @@ export function StatusPageEmbed({
   const [html, setHtml] = useState<string>('')
 
   useEffect(() => {
-    try {
-      const pageHtml = userStatusPage.generateStatusPageHtml(projectId)
-      setHtml(pageHtml)
-    } catch {
-      // 忽略错误
+    const loadHtml = async () => {
+      try {
+        const pageHtml = await userStatusPage.generateStatusPageHtml(projectId)
+        setHtml(pageHtml)
+      } catch {
+        // 忽略错误
+      }
     }
+    loadHtml()
   }, [projectId])
 
   if (!html) return null

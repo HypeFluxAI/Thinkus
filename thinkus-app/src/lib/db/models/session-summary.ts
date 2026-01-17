@@ -51,6 +51,9 @@ export interface ISessionSummary extends Document {
   // 时间戳
   createdAt: Date
   updatedAt: Date
+
+  // 方法
+  toContextText(): string
 }
 
 // Session Summary Schema

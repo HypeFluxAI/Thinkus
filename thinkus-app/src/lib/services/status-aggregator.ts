@@ -3,19 +3,25 @@
  * 聚合各项服务状态为简化的红绿灯状态
  */
 
-import {
+import type {
   SimpleStatus,
-  SERVICE_CHECKS,
   ServiceCheck,
   CheckStatus,
   AggregatedStatus,
   StatusIssue,
+} from '../config/simple-status'
+
+import {
+  SERVICE_CHECKS,
   getStatusFromScore,
   getStatusFromResponseTime,
   getStatusFromErrorRate,
   mergeStatuses,
   STATUS_THRESHOLDS
 } from '../config/simple-status'
+
+// 重新导出类型以便其他模块使用
+export type { AggregatedStatus, StatusIssue, SimpleStatus, CheckStatus }
 
 /**
  * 项目部署信息

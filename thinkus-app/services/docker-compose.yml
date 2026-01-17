@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Python 微服务
+  # ============================================
+
+  # 测试数据生成服务
+  py-test-data:
+    build: ./py-test-data
+    ports:
+      - "9001:9001"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - REDIS_URL=${REDIS_URL}
+    networks:
+      - thinkus-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 自动诊断服务
+  py-auto-diagnose:
+    build: ./py-auto-diagnose
+    ports:
+      - "9002:9002"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - MONGODB_URI=${MONGODB_URI}
+      - SUPPORT_WEBHOOK=${SUPPORT_WEBHOOK}
+    networks:
+      - thinkus-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 问题根因分析服务
+  py-root-cause:
+    build: ./py-root-cause
+    ports:
+      - "9003:9003"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - MONGODB_URI=${MONGODB_URI}
+      - REDIS_URL=${REDIS_URL}
+    networks:
+      - thinkus-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # Go 微服务
+  # ============================================
+
+  # 智能部署服务
+  go-smart-deploy:
+    build: ./go-smart-deploy
+    ports:
+      - "8001:8001"
+    environment:
+      - VERCEL_TOKEN=${VERCEL_TOKEN}
+      - RAILWAY_TOKEN=${RAILWAY_TOKEN}
+      - RENDER_TOKEN=${RENDER_TOKEN}
+      - MONGODB_URI=${MONGODB_URI}
+      - REDIS_URL=${REDIS_URL}
+    networks:
+      - thinkus-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 首次使用追踪服务
+  go-first-use-tracker:
+    build: ./go-first-use-tracker
+    ports:
+      - "8002:8002"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - REDIS_URL=${REDIS_URL}
+    networks:
+      - thinkus-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # 基础设施
+  # ============================================
+
+  # Redis（用于服务间通信和缓存）
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - thinkus-network
+    command: redis-server --appendonly yes
+
+networks:
+  thinkus-network:
+    driver: bridge
+
+volumes:
+  redis-data:

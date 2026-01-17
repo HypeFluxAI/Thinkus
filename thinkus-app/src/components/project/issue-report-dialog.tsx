@@ -11,6 +11,7 @@ import {
   IssueType,
   IssueReport,
   DiagnosisResult,
+  SystemInfo,
   ISSUE_TYPE_CONFIG
 } from '@/lib/services/issue-reporter'
 
@@ -75,10 +76,10 @@ export function IssueReportDialog({
 
     try {
       // 收集系统信息
-      const systemInfo = {
+      const systemInfo: Partial<SystemInfo> = {
         browser: navigator.userAgent,
         screenResolution: `${window.screen.width}x${window.screen.height}`,
-        networkStatus: navigator.onLine ? 'online' : 'offline' as const,
+        networkStatus: navigator.onLine ? 'online' : 'offline',
         currentUrl: window.location.href
       }
 

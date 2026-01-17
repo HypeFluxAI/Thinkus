@@ -9,7 +9,7 @@
  */
 
 import { autoOps, CheckResult } from './auto-ops'
-import { statusAggregator, AggregatedStatus } from './status-aggregator'
+import { statusAggregator, AggregatedStatus, SimpleStatus } from './status-aggregator'
 
 // ============================================================================
 // 类型定义
@@ -191,19 +191,19 @@ export class UserStatusPageService {
   /**
    * 创建状态页
    */
-  createStatusPage(config: StatusPageConfig): StatusPageData {
+  async createStatusPage(config: StatusPageConfig): Promise<StatusPageData> {
     this.configs.set(config.projectId, config)
     this.incidents.set(config.projectId, [])
     this.maintenances.set(config.projectId, [])
     this.uptimeHistory.set(config.projectId, this.initializeUptimeHistory())
 
-    return this.getStatusPage(config.projectId)
+    return await this.getStatusPage(config.projectId)
   }
 
   /**
    * 获取状态页数据
    */
-  getStatusPage(projectId: string): StatusPageData {
+  async getStatusPage(projectId: string): Promise<StatusPageData> {
     const config = this.configs.get(projectId)
     if (!config) {
       throw new Error(`状态页 ${projectId} 不存在`)
@@ -212,15 +212,15 @@ export class UserStatusPageService {
     // 获取聚合状态
     const aggregatedStatus = statusAggregator.aggregateStatus({
       projectId,
-      deploymentStatus: 'active',
-      databaseStatus: 'connected'
+      deployment: { status: 'active' },
+      database: { connected: true }
     })
 
     // 获取运维检查结果
-    const dashboard = autoOps.getDashboard(projectId)
+    const dashboard = await autoOps.getDashboard(projectId)
 
     // 构建组件状态
-    const components = this.buildComponents(aggregatedStatus, dashboard?.lastInspection?.results || [])
+    const components = this.buildComponents(aggregatedStatus, dashboard?.lastInspection?.checks || [])
 
     // 计算总体状态
     const overallStatus = this.calculateOverallStatus(components)
@@ -262,17 +262,17 @@ export class UserStatusPageService {
 
     // 从聚合状态构建
     for (const check of aggregatedStatus.checks) {
-      const defaultComp = DEFAULT_COMPONENTS.find(c => c.id === check.name)
+      const defaultComp = DEFAULT_COMPONENTS.find(c => c.id === check.checkId)
 
       components.push({
-        id: check.name,
-        name: defaultComp?.name || check.name,
+        id: check.checkId,
+        name: defaultComp?.name || check.checkId,
         description: defaultComp?.description || '',
-        status: this.mapCheckStatusToComponentStatus(check.status),
+        status: this.mapSimpleStatusToComponentStatus(check.status),
         icon: defaultComp?.icon || '🔧',
-        lastChecked: new Date(),
-        responseTime: check.responseTime,
-        uptimePercent: check.status === 'ok' ? 99.9 : check.status === 'warning' ? 95 : 80
+        lastChecked: check.lastChecked,
+        responseTime: typeof check.value === 'number' ? check.value : undefined,
+        uptimePercent: check.status === 'healthy' ? 99.9 : check.status === 'attention' ? 95 : 80
       })
     }
 
@@ -280,12 +280,12 @@ export class UserStatusPageService {
   }
 
   /**
-   * 映射检查状态到组件状态
+   * 映射简化状态到组件状态
    */
-  private mapCheckStatusToComponentStatus(status: 'ok' | 'warning' | 'error'): ComponentStatus {
+  private mapSimpleStatusToComponentStatus(status: SimpleStatus): ComponentStatus {
     switch (status) {
-      case 'ok': return 'operational'
-      case 'warning': return 'degraded'
+      case 'healthy': return 'operational'
+      case 'attention': return 'degraded'
       case 'error': return 'major_outage'
     }
   }
@@ -514,8 +514,8 @@ export class UserStatusPageService {
   /**
    * 生成状态页 HTML
    */
-  generateStatusPageHtml(projectId: string): string {
-    const data = this.getStatusPage(projectId)
+  async generateStatusPageHtml(projectId: string): Promise<string> {
+    const data = await this.getStatusPage(projectId)
     const config = this.configs.get(projectId)
 
     const statusColor = COMPONENT_STATUS_CONFIG[data.overallStatus].color
@@ -638,8 +638,8 @@ export class UserStatusPageService {
   /**
    * 生成嵌入式状态小部件
    */
-  generateStatusWidget(projectId: string): string {
-    const data = this.getStatusPage(projectId)
+  async generateStatusWidget(projectId: string): Promise<string> {
+    const data = await this.getStatusPage(projectId)
     const statusCfg = COMPONENT_STATUS_CONFIG[data.overallStatus]
 
     return `

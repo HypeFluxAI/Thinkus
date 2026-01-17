@@ -259,3 +259,47 @@ export type {
   IAnalyticsEventModel,
   AnalyticsEventType,
 } from './analytics-event'
+
+// 交付会话
+export { DeliverySession } from './delivery-session'
+export type {
+  IDeliverySession,
+  IDeliverySessionModel,
+  DeliveryStage,
+  StageStatus,
+  StageInfo,
+  DeliveryOutputs,
+  DeliveryConfig,
+} from './delivery-session'
+
+// 交付事件
+export { DeliveryEvent } from './delivery-event'
+export type {
+  IDeliveryEvent,
+  IDeliveryEventModel,
+  DeliveryEventType,
+  EventLevel,
+} from './delivery-event'
+
+// 验收会话
+export { AcceptanceSession } from './acceptance-session'
+export type {
+  IAcceptanceSession,
+  IAcceptanceSessionModel,
+  AcceptanceStatus,
+  CheckItemStatus,
+  AcceptanceCheckItem,
+  AcceptanceIssue,
+} from './acceptance-session'
+
+// 交付报告
+export { DeliveryReport } from './delivery-report'
+export type {
+  IDeliveryReport,
+  IDeliveryReportModel,
+  DeliveryReportType,
+  ReportStatus,
+  TestReportData,
+  AcceptanceReportData,
+  DeliveryReportData,
+} from './delivery-report'

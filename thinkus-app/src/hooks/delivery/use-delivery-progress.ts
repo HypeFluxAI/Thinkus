@@ -39,14 +39,13 @@ export function useDeliveryProgress({
     setError(null)
 
     try {
-      const response = await fetch(`/api/delivery/progress?projectId=${projectId}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setSession(data.data)
-      } else {
-        setError(data.error || '获取进度失败')
+      const response = await fetch(`/api/delivery/${projectId}`)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '获取进度失败')
       }
+      const data = await response.json()
+      setSession(data.session as ProgressSession)
     } catch (err) {
       setError(err instanceof Error ? err.message : '网络错误')
     } finally {

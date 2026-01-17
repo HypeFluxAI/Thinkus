@@ -1,0 +1,274 @@
+syntax = "proto3";
+
+package ai;
+
+option go_package = "github.com/thinkus/proto/ai";
+
+import "common.proto";
+
+// ============================================
+// AI 产品导游服务
+// ============================================
+
+service AIGuideService {
+  // 开始引导会话
+  rpc StartGuide(StartGuideRequest) returns (GuideResponse);
+
+  // 处理用户操作
+  rpc ProcessAction(ActionRequest) returns (GuideResponse);
+
+  // AI 问答
+  rpc AskAI(AskRequest) returns (AIAnswer);
+
+  // 获取会话信息
+  rpc GetSession(SessionRequest) returns (GuideSession);
+}
+
+message StartGuideRequest {
+  string user_id = 1;
+  string project_id = 2;
+  string guide_type = 3;  // first_time, feature_tour, task_guide, troubleshoot, customization
+  optional string target_feature = 4;
+  optional string user_question = 5;
+}
+
+message ActionRequest {
+  string session_id = 1;
+  string action = 2;  // next, back, skip, stuck, complete
+  optional string user_input = 3;
+  optional string screenshot_url = 4;
+}
+
+message AskRequest {
+  string session_id = 1;
+  string question = 2;
+  optional string screenshot_url = 3;
+}
+
+message SessionRequest {
+  string session_id = 1;
+}
+
+message GuideStep {
+  string id = 1;
+  int32 order = 2;
+  string type = 3;  // welcome, highlight, click, input, explain, video, quiz, celebration
+  string title = 4;
+  string content = 5;
+  optional string target_element = 6;
+  optional string action_hint = 7;
+  repeated string tips = 8;
+  int32 duration_seconds = 9;
+  bool can_skip = 10;
+}
+
+message GuideResponse {
+  string session_id = 1;
+  GuideStep current_step = 2;
+  int32 total_steps = 3;
+  float progress_percent = 4;
+  int32 estimated_time_remaining = 5;
+  bool can_go_back = 6;
+  bool can_skip = 7;
+  string encouragement = 8;
+}
+
+message GuideSession {
+  string id = 1;
+  string user_id = 2;
+  string project_id = 3;
+  string guide_type = 4;
+  repeated GuideStep steps = 5;
+  int32 current_step_index = 6;
+  repeated string completed_steps = 7;
+  float progress_percent = 8;
+  bool is_active = 9;
+}
+
+message AIAnswer {
+  string message = 1;
+  repeated string suggestions = 2;
+  optional GuideStep next_step = 3;
+  float confidence = 4;
+}
+
+// ============================================
+// AI 智能客服服务
+// ============================================
+
+service AISupportService {
+  // 发送消息
+  rpc Chat(ChatRequest) returns (ChatResponse);
+
+  // 执行修复
+  rpc ExecuteFix(FixRequest) returns (FixResponse);
+
+  // 分析截图
+  rpc AnalyzeScreenshot(ScreenshotRequest) returns (ScreenshotAnalysis);
+
+  // 升级到人工
+  rpc Escalate(EscalateRequest) returns (EscalateResponse);
+}
+
+message ChatRequest {
+  string user_id = 1;
+  string project_id = 2;
+  string message = 3;
+  optional string screenshot_base64 = 4;
+  optional string category = 5;
+  optional string session_id = 6;
+}
+
+message ChatResponse {
+  string session_id = 1;
+  string message = 2;
+  optional Diagnosis diagnosis = 3;
+  repeated AutoFix suggested_fixes = 4;
+  repeated string quick_replies = 5;
+  bool need_human = 6;
+  optional string escalation_reason = 7;
+}
+
+message Diagnosis {
+  string result = 1;  // identified, partial, unknown, need_more_info
+  string category = 2;
+  float confidence = 3;
+  repeated string possible_causes = 4;
+  bool need_screenshot = 5;
+  bool need_more_info = 6;
+  repeated string questions_to_ask = 7;
+}
+
+message AutoFix {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string steps = 4;
+  string risk_level = 5;  // low, medium, high
+  int32 estimated_time = 6;
+  bool requires_confirmation = 7;
+}
+
+message FixRequest {
+  string session_id = 1;
+  string fix_id = 2;
+  bool confirmed = 3;
+}
+
+message FixResponse {
+  bool success = 1;
+  string message = 2;
+  optional string details = 3;
+  repeated string next_steps = 4;
+}
+
+message ScreenshotRequest {
+  string screenshot_base64 = 1;
+}
+
+message ScreenshotAnalysis {
+  bool has_error = 1;
+  optional string error_type = 2;
+  optional string error_message = 3;
+  repeated string visible_elements = 4;
+  repeated string suggestions = 5;
+  string description = 6;
+}
+
+message EscalateRequest {
+  string session_id = 1;
+  optional string reason = 2;
+}
+
+message EscalateResponse {
+  bool success = 1;
+  string message = 2;
+  string estimated_wait = 3;
+}
+
+// ============================================
+// AI 主动关怀服务
+// ============================================
+
+service AICareService {
+  // 更新用户活动
+  rpc UpdateActivity(UpdateActivityRequest) returns (common.Empty);
+
+  // 记录卡住点
+  rpc RecordStuck(StuckRequest) returns (common.Empty);
+
+  // 获取用户活动
+  rpc GetActivity(GetActivityRequest) returns (UserActivity);
+
+  // 获取关怀记录
+  rpc GetCareRecords(CareRecordsRequest) returns (CareRecordsResponse);
+
+  // 手动触发关怀
+  rpc TriggerCare(TriggerCareRequest) returns (TriggerCareResponse);
+}
+
+message UpdateActivityRequest {
+  string user_id = 1;
+  string project_id = 2;
+  int32 login_count_7d = 3;
+  int32 action_count_7d = 4;
+  repeated string features_used = 5;
+}
+
+message StuckRequest {
+  string user_id = 1;
+  string project_id = 2;
+  string feature = 3;
+  int32 time_spent = 4;  // seconds
+}
+
+message GetActivityRequest {
+  string user_id = 1;
+  string project_id = 2;
+}
+
+message UserActivity {
+  string user_id = 1;
+  string project_id = 2;
+  string activity_level = 3;  // highly_active, active, moderate, low, inactive, churned
+  int32 days_since_active = 4;
+  int32 login_count_7d = 5;
+  int32 action_count_7d = 6;
+  repeated string features_used = 7;
+  double churn_risk = 8;
+}
+
+message CareRecordsRequest {
+  string user_id = 1;
+  int32 limit = 2;
+}
+
+message CareRecord {
+  string id = 1;
+  string user_id = 2;
+  string type = 3;  // welcome, first_week, inactivity, stuck, etc.
+  string channel = 4;
+  string message = 5;
+  int64 sent_at = 6;
+  bool opened = 7;
+  bool responded = 8;
+}
+
+message CareRecordsResponse {
+  repeated CareRecord records = 1;
+}
+
+message TriggerCareRequest {
+  string user_id = 1;
+  string project_id = 2;
+  string care_type = 3;
+  optional string channel = 4;
+}
+
+message TriggerCareResponse {
+  bool success = 1;
+  string message = 2;
+  string type = 3;
+  string title = 4;
+  string content = 5;
+}

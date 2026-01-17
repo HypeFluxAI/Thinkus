@@ -72,32 +72,66 @@ export function useDeliveryStream({
     setError(null)
 
     try {
-      const eventSource = new EventSource(`/api/delivery/stream?projectId=${projectId}`)
+      const eventSource = new EventSource(`/api/delivery/${projectId}/stream`)
       eventSourceRef.current = eventSource
 
-      // 连接成功
-      eventSource.addEventListener('connected', (event) => {
+      // 通用消息处理
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+
+          // 初始状态
+          if (data.type === 'init') {
+            setIsConnected(true)
+            setError(null)
+            onConnected?.()
+            if (data.session) {
+              setLatestProgress(data.session as ProgressSession)
+              onProgress?.(data.session as ProgressSession)
+            }
+            console.log('SSE 已连接:', data)
+          }
+
+          // 阶段更新
+          if (data.type === 'stage_update') {
+            const progressData = {
+              stage: data.stage,
+              status: data.status,
+              progress: data.progress,
+              currentTask: data.currentTask,
+              outputs: data.outputs,
+            } as ProgressSession
+            setLatestProgress(progressData)
+            onProgress?.(progressData)
+          }
+
+          // 单个事件
+          if (data.type === 'event') {
+            console.log('交付事件:', data.event)
+          }
+
+          // 完成
+          if (data.type === 'complete') {
+            const completeData = {
+              stage: 'completed',
+              status: data.status,
+              outputs: data.outputs,
+              completedAt: data.completedAt,
+              error: data.error,
+            } as ProgressSession
+            setLatestProgress(completeData)
+            onProgress?.(completeData)
+          }
+        } catch (err) {
+          console.error('解析 SSE 数据失败:', err)
+        }
+      }
+
+      // 连接打开
+      eventSource.onopen = () => {
         setIsConnected(true)
         setError(null)
-        onConnected?.()
-        console.log('SSE 已连接:', JSON.parse(event.data))
-      })
-
-      // 进度更新
-      eventSource.addEventListener('progress', (event) => {
-        try {
-          const data = JSON.parse(event.data) as ProgressSession
-          setLatestProgress(data)
-          onProgress?.(data)
-        } catch (err) {
-          console.error('解析进度数据失败:', err)
-        }
-      })
-
-      // 心跳
-      eventSource.addEventListener('heartbeat', () => {
-        // 收到心跳，保持连接
-      })
+      }
 
       // 错误处理
       eventSource.onerror = () => {

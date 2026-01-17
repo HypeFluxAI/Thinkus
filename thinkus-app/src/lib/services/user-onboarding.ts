@@ -38,6 +38,7 @@ export interface UserAccount {
   passwordChangedAt?: Date
   loginAttempts: number
   lockoutUntil?: Date
+  notificationSent?: boolean      // 是否已发送通知
 }
 
 // 凭证信息
@@ -73,6 +74,16 @@ export interface AccountConfig {
   sendWelcomeEmail: boolean
   sendSms: boolean
   generateSecureLink: boolean
+}
+
+// 交付结果
+export interface OnboardingResult {
+  success: boolean
+  accounts: UserAccount[]
+  deliveredAt: Date
+  productUrl: string
+  adminUrl: string
+  error?: string
 }
 
 // 账号类型权限
@@ -410,6 +421,44 @@ export class UserOnboardingService {
 
     await new Promise(resolve => setTimeout(resolve, 500))
     notification.deliveredAt = new Date()
+
+    const records = this.notifications.get(account.id) || []
+    records.push(notification)
+    this.notifications.set(account.id, records)
+  }
+
+  /**
+   * 发送欢迎通知（公开方法）
+   */
+  async sendWelcomeNotification(
+    account: UserAccount,
+    loginUrl: string,
+    channel: NotificationChannel
+  ): Promise<void> {
+    const credentials: CredentialInfo = {
+      accountId: account.id,
+      email: account.email,
+      tempPassword: account.tempPassword || '******',  // 如果没有临时密码，使用占位符
+      loginUrl,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    }
+
+    if (channel === 'email') {
+      await this.sendWelcomeEmail(account, credentials)
+    } else if (channel === 'sms' && account.phone) {
+      await this.sendWelcomeSms(account, credentials)
+    }
+
+    // 记录通知
+    const notification: NotificationRecord = {
+      id: `notif_${Date.now()}`,
+      accountId: account.id,
+      channel,
+      sentAt: new Date(),
+      deliveredAt: new Date(),
+      content: `账号凭证已发送到 ${channel === 'email' ? account.email : account.phone}`,
+      success: true
+    }
 
     const records = this.notifications.get(account.id) || []
     records.push(notification)

@@ -109,7 +109,7 @@ export function DeliveryChecklistPanel({
 
   // 排序后的类别
   const sortedCategories = useMemo(() => {
-    return Array.from(groupedItems.keys())
+    return Array.from(groupedItems.keys() as Iterable<CheckCategory>)
       .sort((a, b) => categoryConfig[a].order - categoryConfig[b].order)
   }, [groupedItems, categoryConfig])
 
@@ -242,7 +242,7 @@ export function DeliveryChecklistPanel({
               {sortedCategories.map(category => {
                 const items = groupedItems.get(category)!
                 const config = categoryConfig[category]
-                const passedCount = items.filter(i => i.status === 'passed').length
+                const passedCount = items.filter((i: ChecklistItem) => i.status === 'passed').length
                 const isExpanded = expandedCategory === category
 
                 return (
@@ -271,7 +271,7 @@ export function DeliveryChecklistPanel({
 
                     {isExpanded && (
                       <div className="border-t p-4 bg-gray-50 dark:bg-gray-800/30 space-y-2">
-                        {items.map(item => (
+                        {items.map((item: ChecklistItem) => (
                           <ChecklistItemRow
                             key={item.id}
                             item={item}

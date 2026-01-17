@@ -22,6 +22,7 @@ import {
   Bot,
 } from 'lucide-react'
 import { useDevelopmentEvents, type AgentStatus, type LogEntry } from '@/hooks/use-development-events'
+import { FriendlyError, FriendlyErrorInline } from '@/components/ui/friendly-error'
 
 // Claude Code Agent 配置
 const CLAUDE_CODE_AGENT = {
@@ -37,6 +38,7 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
   const [hasStarted, setHasStarted] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
   const [showTerminal, setShowTerminal] = useState(true)
+  const [developmentError, setDevelopmentError] = useState<Error | null>(null)
   const codeScrollRef = useRef<HTMLDivElement>(null)
   const logScrollRef = useRef<HTMLDivElement>(null)
 
@@ -81,6 +83,7 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
   const startDevelopment = async () => {
     if (isStarting || hasStarted) return
     setIsStarting(true)
+    setDevelopmentError(null)
 
     try {
       const res = await fetch(`/api/projects/${projectId}/start-development`, {
@@ -89,9 +92,13 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
 
       if (res.ok) {
         setHasStarted(true)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setDevelopmentError(new Error(data.error || `启动失败 (${res.status})`))
       }
     } catch (error) {
       console.error('Failed to start development:', error)
+      setDevelopmentError(error instanceof Error ? error : new Error('启动开发失败，请检查网络连接'))
     } finally {
       setIsStarting(false)
     }
@@ -122,8 +129,12 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
               </>
             )}
           </Badge>
-          {connectionError && (
-            <span className="text-xs text-muted-foreground">{connectionError}</span>
+          {connectionError && !developmentError && (
+            <FriendlyErrorInline
+              error={new Error(connectionError)}
+              onRetry={reconnect}
+              className="text-xs"
+            />
           )}
         </div>
 
@@ -247,7 +258,24 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
               showTerminal ? 'flex-1' : 'flex-1'
             )}
           >
-            {codeContent ? (
+            {developmentError ? (
+              <div className="h-full flex items-center justify-center p-8">
+                <FriendlyError
+                  error={developmentError}
+                  onRetry={() => {
+                    setDevelopmentError(null)
+                    setHasStarted(false)
+                    startDevelopment()
+                  }}
+                  onContactSupport={() => {
+                    window.open('mailto:support@thinkus.app?subject=开发启动失败', '_blank')
+                  }}
+                  showDetails={process.env.NODE_ENV === 'development'}
+                  autoRetry={true}
+                  size="md"
+                />
+              </div>
+            ) : codeContent ? (
               <pre className="p-4 text-sm font-mono text-green-400 whitespace-pre-wrap">
                 <code>{codeContent}</code>
                 {progress < 100 && (
@@ -291,24 +319,36 @@ export default function ProgressPage({ params }: { params: Promise<{ id: string 
                 subTasks.map((task, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    {task.status === 'done' ? (
-                      <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                    ) : task.status === 'running' ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
-                    ) : task.status === 'error' ? (
-                      <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                    ) : (
-                      <Circle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    className={cn(
+                      "flex items-center gap-2 text-xs",
+                      task.status === 'error' && 'flex-col items-start'
                     )}
-                    <span className={cn(
-                      'truncate',
-                      task.status === 'done' && 'text-muted-foreground',
-                      task.status === 'running' && 'text-primary font-medium'
-                    )}>
-                      {task.name}
-                    </span>
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      {task.status === 'done' ? (
+                        <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                      ) : task.status === 'running' ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+                      ) : task.status === 'error' ? (
+                        <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                      ) : (
+                        <Circle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      )}
+                      <span className={cn(
+                        'truncate',
+                        task.status === 'done' && 'text-muted-foreground',
+                        task.status === 'running' && 'text-primary font-medium',
+                        task.status === 'error' && 'text-red-500'
+                      )}>
+                        {task.name}
+                      </span>
+                    </div>
+                    {task.status === 'error' && task.error && (
+                      <FriendlyErrorInline
+                        error={new Error(task.error)}
+                        className="mt-1 w-full text-[10px]"
+                      />
+                    )}
                   </div>
                 ))
               ) : (

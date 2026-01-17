@@ -93,7 +93,7 @@ export function promisifyServerStream<TRequest, TResponse>(
   client: grpc.Client,
   method: (request: TRequest) => grpc.ClientReadableStream<TResponse>
 ): (request: TRequest) => AsyncIterable<TResponse> {
-  return function* (request: TRequest): AsyncIterable<TResponse> {
+  return function (request: TRequest): AsyncIterable<TResponse> {
     const stream = method.call(client, request)
 
     return {
@@ -112,8 +112,8 @@ export function promisifyServerStream<TRequest, TResponse>(
           },
         }
       },
-    } as unknown as AsyncIterable<TResponse>
-  } as unknown as (request: TRequest) => AsyncIterable<TResponse>
+    }
+  }
 }
 
 // Export service URLs

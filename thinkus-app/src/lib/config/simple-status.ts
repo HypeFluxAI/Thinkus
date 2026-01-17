@@ -4,7 +4,7 @@
  */
 
 /**
- * 简化状态类型
+ * 简化状态类型（红绿灯）
  */
 export type SimpleStatus = 'healthy' | 'attention' | 'error'
 
@@ -14,7 +14,7 @@ export type SimpleStatus = 'healthy' | 'attention' | 'error'
 export const STATUS_ICONS: Record<SimpleStatus, string> = {
   healthy: '🟢',
   attention: '🟡',
-  error: '🔴'
+  error: '🔴',
 }
 
 /**
@@ -23,44 +23,40 @@ export const STATUS_ICONS: Record<SimpleStatus, string> = {
 export const STATUS_LABELS: Record<SimpleStatus, string> = {
   healthy: '运行正常',
   attention: '需要关注',
-  error: '出现问题'
+  error: '出现问题',
 }
 
 /**
- * 状态颜色配置
+ * 状态颜色
  */
 export const STATUS_COLORS: Record<SimpleStatus, {
   bg: string
-  border: string
   text: string
-  pulse: string
-  gradient: string
+  border: string
+  ring: string
 }> = {
   healthy: {
-    bg: 'bg-green-50 dark:bg-green-950/20',
-    border: 'border-green-200 dark:border-green-800',
-    text: 'text-green-700 dark:text-green-400',
-    pulse: 'bg-green-500',
-    gradient: 'from-green-500 to-emerald-500'
+    bg: 'bg-green-50',
+    text: 'text-green-700',
+    border: 'border-green-200',
+    ring: 'ring-green-500',
   },
   attention: {
-    bg: 'bg-yellow-50 dark:bg-yellow-950/20',
-    border: 'border-yellow-200 dark:border-yellow-800',
-    text: 'text-yellow-700 dark:text-yellow-400',
-    pulse: 'bg-yellow-500',
-    gradient: 'from-yellow-500 to-amber-500'
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    border: 'border-amber-200',
+    ring: 'ring-amber-500',
   },
   error: {
-    bg: 'bg-red-50 dark:bg-red-950/20',
-    border: 'border-red-200 dark:border-red-800',
-    text: 'text-red-700 dark:text-red-400',
-    pulse: 'bg-red-500',
-    gradient: 'from-red-500 to-rose-500'
-  }
+    bg: 'bg-red-50',
+    text: 'text-red-700',
+    border: 'border-red-200',
+    ring: 'ring-red-500',
+  },
 }
 
 /**
- * 状态描述模板
+ * 状态描述
  */
 export const STATUS_DESCRIPTIONS: Record<SimpleStatus, {
   title: string
@@ -69,287 +65,281 @@ export const STATUS_DESCRIPTIONS: Record<SimpleStatus, {
 }> = {
   healthy: {
     title: '一切正常',
-    subtitle: '您的产品正在稳定运行中',
-    emoji: '✨'
+    subtitle: '您的产品运行良好，无需任何操作',
+    emoji: '✨',
   },
   attention: {
-    title: '需要注意',
-    subtitle: '有一些小问题需要关注',
-    emoji: '👀'
+    title: '需要关注',
+    subtitle: '有一些小问题需要您注意，但产品仍在运行',
+    emoji: '👀',
   },
   error: {
-    title: '需要处理',
-    subtitle: '遇到了一些问题，需要您的关注',
-    emoji: '🔧'
-  }
+    title: '出现问题',
+    subtitle: '您的产品遇到了一些问题，我们正在处理',
+    emoji: '🔧',
+  },
 }
 
 /**
- * 服务检查项配置
+ * 服务检查类型
+ */
+export type ServiceCheckType =
+  | 'deployment'      // 部署状态
+  | 'database'        // 数据库状态
+  | 'domain'          // 域名/SSL状态
+  | 'api'             // API健康
+  | 'response_time'   // 响应时间
+  | 'error_rate'      // 错误率
+
+/**
+ * 服务检查配置
  */
 export interface ServiceCheck {
-  id: string
-  name: string
+  type: ServiceCheckType
+  label: string
   description: string
-  icon: string
-  category: ServiceCategory
-  weight: number // 权重（用于计算整体状态）
-  critical: boolean // 是否是关键服务
+  weight: number        // 权重 0-100
+  isCritical: boolean   // 是否关键（关键服务异常直接红灯）
+  thresholds: {
+    healthy: number     // 健康阈值
+    attention: number   // 警告阈值
+  }
+  unit?: string
 }
 
-export type ServiceCategory =
-  | 'infrastructure' // 基础设施
-  | 'application'    // 应用服务
-  | 'external'       // 外部服务
-  | 'security'       // 安全相关
-
 /**
- * 预定义的服务检查项
+ * 服务检查配置列表
  */
 export const SERVICE_CHECKS: ServiceCheck[] = [
-  // 基础设施
   {
-    id: 'deployment',
-    name: '部署状态',
-    description: '应用是否成功部署到服务器',
-    icon: '🚀',
-    category: 'infrastructure',
+    type: 'deployment',
+    label: '部署状态',
+    description: '产品是否正常部署上线',
     weight: 30,
-    critical: true
+    isCritical: true,
+    thresholds: {
+      healthy: 1,    // 1 = 部署成功
+      attention: 0,  // 0 = 部署中
+    },
   },
   {
-    id: 'database',
-    name: '数据库',
-    description: '数据库连接和响应状态',
-    icon: '🗄️',
-    category: 'infrastructure',
+    type: 'database',
+    label: '数据库',
+    description: '数据库连接是否正常',
     weight: 25,
-    critical: true
+    isCritical: true,
+    thresholds: {
+      healthy: 1,    // 1 = 连接正常
+      attention: 0,  // 0 = 连接中
+    },
   },
   {
-    id: 'domain',
-    name: '域名/SSL',
-    description: '域名解析和SSL证书状态',
-    icon: '🌐',
-    category: 'infrastructure',
+    type: 'domain',
+    label: '域名与SSL',
+    description: '域名解析和安全证书状态',
     weight: 15,
-    critical: true
+    isCritical: false,
+    thresholds: {
+      healthy: 1,    // 1 = 正常
+      attention: 0,  // 0 = 配置中
+    },
   },
-  // 应用服务
   {
-    id: 'api',
-    name: 'API服务',
-    description: 'API接口响应状态',
-    icon: '⚡',
-    category: 'application',
+    type: 'api',
+    label: 'API服务',
+    description: 'API接口是否响应',
     weight: 15,
-    critical: true
+    isCritical: true,
+    thresholds: {
+      healthy: 1,    // 1 = 正常
+      attention: 0,  // 0 = 偶发异常
+    },
   },
   {
-    id: 'response_time',
-    name: '响应速度',
-    description: '页面加载和API响应时间',
-    icon: '⏱️',
-    category: 'application',
+    type: 'response_time',
+    label: '响应速度',
+    description: '产品加载速度',
     weight: 10,
-    critical: false
+    isCritical: false,
+    thresholds: {
+      healthy: 1000,     // < 1秒为健康
+      attention: 3000,   // < 3秒为警告
+    },
+    unit: 'ms',
   },
-  // 安全相关
   {
-    id: 'error_rate',
-    name: '错误率',
-    description: '最近的错误发生频率',
-    icon: '📊',
-    category: 'security',
+    type: 'error_rate',
+    label: '错误率',
+    description: '最近24小时错误比例',
     weight: 5,
-    critical: false
-  }
+    isCritical: false,
+    thresholds: {
+      healthy: 1,      // < 1% 为健康
+      attention: 5,    // < 5% 为警告
+    },
+    unit: '%',
+  },
 ]
 
 /**
- * 检查项状态
+ * 服务检查结果
  */
-export interface CheckStatus {
-  checkId: string
+export interface ServiceCheckResult {
+  type: ServiceCheckType
   status: SimpleStatus
+  value: number
   message: string
-  value?: number | string
+  messageZh: string
   lastChecked: Date
-  details?: Record<string, unknown>
 }
 
 /**
  * 聚合状态结果
  */
 export interface AggregatedStatus {
-  /** 整体状态 */
   overall: SimpleStatus
-  /** 健康度分数 (0-100) */
-  score: number
-  /** 各检查项状态 */
-  checks: CheckStatus[]
-  /** 需要关注的问题 */
-  issues: StatusIssue[]
-  /** 上次检查时间 */
-  lastChecked: Date
-  /** 连续正常天数 */
-  uptimeDays: number
+  score: number           // 0-100 健康分数
+  checks: ServiceCheckResult[]
+  issues: string[]        // 问题列表
+  uptimeDays: number      // 连续正常天数
+  lastUpdated: Date
 }
 
 /**
- * 状态问题
+ * 计算单个检查的状态
  */
-export interface StatusIssue {
-  id: string
-  severity: 'low' | 'medium' | 'high' | 'critical'
-  title: string
-  description: string
-  suggestion: string
-  canAutoFix: boolean
-  affectedService: string
-}
+export function calculateCheckStatus(
+  check: ServiceCheck,
+  value: number
+): SimpleStatus {
+  // 对于关键服务，0表示正常
+  if (check.isCritical) {
+    if (value === 1) return 'healthy'
+    if (value === 0) return 'attention'
+    return 'error'
+  }
 
-/**
- * 状态阈值配置
- */
-export const STATUS_THRESHOLDS = {
-  // 响应时间阈值 (毫秒)
-  responseTime: {
-    healthy: 500,      // < 500ms 正常
-    attention: 2000,   // 500-2000ms 需要关注
-    // > 2000ms 异常
-  },
-  // 错误率阈值 (百分比)
-  errorRate: {
-    healthy: 1,        // < 1% 正常
-    attention: 5,      // 1-5% 需要关注
-    // > 5% 异常
-  },
-  // 可用率阈值 (百分比)
-  uptime: {
-    healthy: 99.9,     // > 99.9% 正常
-    attention: 99,     // 99-99.9% 需要关注
-    // < 99% 异常
-  },
-  // 整体健康分数阈值
-  overallScore: {
-    healthy: 90,       // >= 90 正常
-    attention: 70,     // 70-90 需要关注
-    // < 70 异常
+  // 对于响应时间等，数值越小越好
+  if (check.type === 'response_time') {
+    if (value <= check.thresholds.healthy) return 'healthy'
+    if (value <= check.thresholds.attention) return 'attention'
+    return 'error'
   }
-}
 
-/**
- * 根据分数计算状态
- */
-export function getStatusFromScore(score: number): SimpleStatus {
-  if (score >= STATUS_THRESHOLDS.overallScore.healthy) {
-    return 'healthy'
+  // 对于错误率，数值越小越好
+  if (check.type === 'error_rate') {
+    if (value <= check.thresholds.healthy) return 'healthy'
+    if (value <= check.thresholds.attention) return 'attention'
+    return 'error'
   }
-  if (score >= STATUS_THRESHOLDS.overallScore.attention) {
-    return 'attention'
-  }
+
+  // 默认逻辑
+  if (value >= check.thresholds.healthy) return 'healthy'
+  if (value >= check.thresholds.attention) return 'attention'
   return 'error'
 }
 
 /**
- * 根据响应时间计算状态
+ * 状态优先级（用于聚合）
  */
-export function getStatusFromResponseTime(ms: number): SimpleStatus {
-  if (ms <= STATUS_THRESHOLDS.responseTime.healthy) {
-    return 'healthy'
-  }
-  if (ms <= STATUS_THRESHOLDS.responseTime.attention) {
-    return 'attention'
-  }
-  return 'error'
+export const STATUS_PRIORITY: Record<SimpleStatus, number> = {
+  error: 0,      // 最高优先级
+  attention: 1,
+  healthy: 2,    // 最低优先级
 }
 
 /**
- * 根据错误率计算状态
+ * 获取更严重的状态
  */
-export function getStatusFromErrorRate(rate: number): SimpleStatus {
-  if (rate <= STATUS_THRESHOLDS.errorRate.healthy) {
-    return 'healthy'
-  }
-  if (rate <= STATUS_THRESHOLDS.errorRate.attention) {
-    return 'attention'
-  }
-  return 'error'
+export function getWorseStatus(a: SimpleStatus, b: SimpleStatus): SimpleStatus {
+  return STATUS_PRIORITY[a] < STATUS_PRIORITY[b] ? a : b
 }
 
 /**
- * 合并多个状态（取最差的）
- */
-export function mergeStatuses(statuses: SimpleStatus[]): SimpleStatus {
-  if (statuses.includes('error')) return 'error'
-  if (statuses.includes('attention')) return 'attention'
-  return 'healthy'
-}
-
-/**
- * 状态操作按钮配置
+ * 建议操作配置
  */
 export interface StatusAction {
-  id: string
   label: string
-  icon: string
-  variant: 'default' | 'outline' | 'destructive'
-  /** 执行动作的类型 */
-  actionType: 'auto_fix' | 'contact_support' | 'view_details' | 'refresh' | 'custom'
+  description: string
+  type: 'auto_fix' | 'contact_support' | 'view_details' | 'retry'
+  priority: number
 }
 
 /**
  * 根据状态获取建议操作
  */
-export function getStatusActions(status: SimpleStatus, hasIssues: boolean): StatusAction[] {
-  const actions: StatusAction[] = []
-
-  // 总是显示刷新按钮
-  actions.push({
-    id: 'refresh',
-    label: '刷新状态',
-    icon: '🔄',
-    variant: 'outline',
-    actionType: 'refresh'
-  })
-
-  if (status === 'healthy') {
-    actions.push({
-      id: 'view_details',
-      label: '查看详情',
-      icon: '📊',
-      variant: 'outline',
-      actionType: 'view_details'
-    })
+export function getStatusActions(status: SimpleStatus): StatusAction[] {
+  switch (status) {
+    case 'healthy':
+      return []
+    case 'attention':
+      return [
+        {
+          label: '查看详情',
+          description: '了解具体情况',
+          type: 'view_details',
+          priority: 1,
+        },
+      ]
+    case 'error':
+      return [
+        {
+          label: '一键修复',
+          description: '尝试自动修复问题',
+          type: 'auto_fix',
+          priority: 1,
+        },
+        {
+          label: '联系客服',
+          description: '获取人工帮助',
+          type: 'contact_support',
+          priority: 2,
+        },
+      ]
   }
-
-  if (status === 'attention' && hasIssues) {
-    actions.push({
-      id: 'auto_fix',
-      label: '一键修复',
-      icon: '🔧',
-      variant: 'default',
-      actionType: 'auto_fix'
-    })
-  }
-
-  if (status === 'error') {
-    actions.push({
-      id: 'auto_fix',
-      label: '尝试修复',
-      icon: '🔧',
-      variant: 'default',
-      actionType: 'auto_fix'
-    })
-    actions.push({
-      id: 'contact_support',
-      label: '联系客服',
-      icon: '💬',
-      variant: 'destructive',
-      actionType: 'contact_support'
-    })
-  }
-
-  return actions
 }
+
+/**
+ * 状态变化通知配置
+ */
+export interface StatusNotification {
+  from: SimpleStatus
+  to: SimpleStatus
+  channels: ('email' | 'sms' | 'in_app')[]
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  template: string
+}
+
+/**
+ * 状态变化通知规则
+ */
+export const STATUS_NOTIFICATION_RULES: StatusNotification[] = [
+  {
+    from: 'healthy',
+    to: 'error',
+    channels: ['email', 'sms', 'in_app'],
+    priority: 'urgent',
+    template: 'status_down',
+  },
+  {
+    from: 'healthy',
+    to: 'attention',
+    channels: ['in_app'],
+    priority: 'normal',
+    template: 'status_warning',
+  },
+  {
+    from: 'error',
+    to: 'healthy',
+    channels: ['email', 'in_app'],
+    priority: 'high',
+    template: 'status_recovered',
+  },
+  {
+    from: 'attention',
+    to: 'healthy',
+    channels: ['in_app'],
+    priority: 'low',
+    template: 'status_improved',
+  },
+]

@@ -88,7 +88,7 @@ export function AccountHandoverPanel({
   const [state, setState] = useState<PanelState>('setup')
   const [accounts, setAccounts] = useState<UserAccount[]>([])
   const [currentAccount, setCurrentAccount] = useState<Partial<UserAccount>>({
-    accountType: 'admin'
+    type: 'admin'
   })
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -116,12 +116,17 @@ export function AccountHandoverPanel({
         setProgress(prev => Math.min(prev + 10, 90))
       }, 200)
 
-      const account = await userOnboarding.createAccount(
+      const { account, credentials } = await userOnboarding.createAccount(
         projectId,
-        email || `user-${Date.now()}@temp.local`,
-        currentAccount.accountType || 'admin',
-        email ? 'email' : 'secure_link',
-        phone || undefined
+        {
+          email: email || `user-${Date.now()}@temp.local`,
+          displayName: email?.split('@')[0] || 'User',
+          type: currentAccount.type || 'admin',
+          phone: phone || undefined,
+          sendWelcomeEmail: !!email,
+          sendSms: !!phone,
+          generateSecureLink: !email
+        }
       )
 
       clearInterval(progressInterval)
@@ -130,20 +135,20 @@ export function AccountHandoverPanel({
       setAccounts(prev => [...prev, account])
 
       // 生成凭证卡片
-      const card = userOnboarding.generateCredentialCard(account, adminUrl)
+      const card = userOnboarding.generateCredentialCard(credentials)
       setCredentialCard(card)
 
       // 重置表单
       setEmail('')
       setPhone('')
-      setCurrentAccount({ accountType: 'admin' })
+      setCurrentAccount({ type: 'admin' })
 
       setState('ready')
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建账号失败')
       setState('setup')
     }
-  }, [projectId, email, phone, currentAccount.accountType, selectedChannel, adminUrl])
+  }, [projectId, email, phone, currentAccount.type, selectedChannel, adminUrl])
 
   // 发送凭证
   const sendCredentials = useCallback(async (account: UserAccount, channel: NotificationChannel) => {
@@ -185,13 +190,23 @@ export function AccountHandoverPanel({
   // 重置密码
   const resetAccountPassword = useCallback(async (account: UserAccount) => {
     try {
-      const updatedAccount = await userOnboarding.resetPassword(account, selectedChannel)
+      const { newPassword, notified } = await userOnboarding.resetPassword(account.id)
+      // 更新账号临时密码（仅用于显示）
       setAccounts(prev => prev.map(a =>
-        a.id === account.id ? updatedAccount : a
+        a.id === account.id ? { ...a, tempPassword: newPassword, status: 'password_reset_required' as const } : a
       ))
 
-      // 更新凭证卡片
-      const card = userOnboarding.generateCredentialCard(updatedAccount, adminUrl)
+      // 生成新的凭证卡片
+      const credentials = {
+        accountId: account.id,
+        email: account.email,
+        tempPassword: newPassword,
+        loginUrl: adminUrl,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24小时后过期
+        notificationChannel: selectedChannel,
+        notificationSent: notified
+      }
+      const card = userOnboarding.generateCredentialCard(credentials)
       setCredentialCard(card)
     } catch (err) {
       setError(err instanceof Error ? err.message : '重置密码失败')
@@ -250,7 +265,7 @@ export function AccountHandoverPanel({
         </CardTitle>
         <CardDescription>
           {state === 'setup' && '为用户创建管理账号并安全发送登录凭证'}
-          {state === 'creating' && `正在创建 ${ACCOUNT_TYPE_CONFIG[currentAccount.accountType || 'admin'].label} 账号...`}
+          {state === 'creating' && `正在创建 ${ACCOUNT_TYPE_CONFIG[currentAccount.type || 'admin'].label} 账号...`}
           {state === 'ready' && `已创建 ${accounts.length} 个账号`}
           {state === 'sending' && '正在发送登录凭证到用户...'}
           {state === 'completed' && '所有账号已创建并发送凭证'}
@@ -268,10 +283,10 @@ export function AccountHandoverPanel({
                 {Object.entries(ACCOUNT_TYPE_CONFIG).map(([type, config]) => (
                   <button
                     key={type}
-                    onClick={() => setCurrentAccount(prev => ({ ...prev, accountType: type as AccountType }))}
+                    onClick={() => setCurrentAccount(prev => ({ ...prev, type: type as AccountType }))}
                     className={cn(
                       'p-4 rounded-lg border-2 text-left transition-all',
-                      currentAccount.accountType === type
+                      currentAccount.type === type
                         ? 'border-primary bg-primary/5'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                     )}
@@ -353,10 +368,10 @@ export function AccountHandoverPanel({
                   {accounts.map(account => (
                     <div key={account.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                       <div className="flex items-center gap-2">
-                        <span>{ACCOUNT_TYPE_CONFIG[account.accountType].icon}</span>
+                        <span>{ACCOUNT_TYPE_CONFIG[account.type].icon}</span>
                         <span className="font-medium">{account.email}</span>
-                        <span className={cn('text-xs px-2 py-0.5 rounded', ACCOUNT_TYPE_CONFIG[account.accountType].color)}>
-                          {ACCOUNT_TYPE_CONFIG[account.accountType].label}
+                        <span className={cn('text-xs px-2 py-0.5 rounded', ACCOUNT_TYPE_CONFIG[account.type].color)}>
+                          {ACCOUNT_TYPE_CONFIG[account.type].label}
                         </span>
                       </div>
                       {account.notificationSent && (
@@ -396,7 +411,7 @@ export function AccountHandoverPanel({
               </h4>
               <div className="space-y-2 text-sm">
                 <p><strong>用户名:</strong> {accounts[accounts.length - 1].email}</p>
-                <p><strong>类型:</strong> {ACCOUNT_TYPE_CONFIG[accounts[accounts.length - 1].accountType].label}</p>
+                <p><strong>类型:</strong> {ACCOUNT_TYPE_CONFIG[accounts[accounts.length - 1].type].label}</p>
                 <p><strong>初始密码:</strong>
                   <span className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded ml-2">
                     {showCredentials ? accounts[accounts.length - 1].tempPassword : '••••••••'}
@@ -504,12 +519,12 @@ export function AccountHandoverPanel({
                 {accounts.map(account => (
                   <div key={account.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span>{ACCOUNT_TYPE_CONFIG[account.accountType].icon}</span>
+                      <span>{ACCOUNT_TYPE_CONFIG[account.type].icon}</span>
                       <span>{account.email}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={cn('text-xs px-2 py-0.5 rounded', ACCOUNT_TYPE_CONFIG[account.accountType].color)}>
-                        {ACCOUNT_TYPE_CONFIG[account.accountType].label}
+                      <span className={cn('text-xs px-2 py-0.5 rounded', ACCOUNT_TYPE_CONFIG[account.type].color)}>
+                        {ACCOUNT_TYPE_CONFIG[account.type].label}
                       </span>
                       {account.notificationSent && (
                         <span className="text-green-600 text-xs">✅ 已通知</span>
@@ -629,11 +644,16 @@ export function QuickAdminSetup({
     setError(null)
 
     try {
-      const account = await userOnboarding.createAccount(
+      const { account } = await userOnboarding.createAccount(
         projectId,
-        email,
-        'admin',
-        'email'
+        {
+          email,
+          displayName: email.split('@')[0],
+          type: 'admin',
+          sendWelcomeEmail: true,
+          sendSms: false,
+          generateSecureLink: false
+        }
       )
 
       await userOnboarding.sendWelcomeNotification(account, adminUrl, 'email')

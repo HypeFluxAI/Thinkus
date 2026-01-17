@@ -354,11 +354,11 @@ function ConfigFieldInput({
 
       {field.type === 'image' && (
         <div className="space-y-2">
-          {value && (
+          {typeof value === 'string' && value && (
             <div className="relative w-32 h-32 rounded-lg overflow-hidden border bg-gray-50 dark:bg-gray-800">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={value as string}
+                src={value}
                 alt={field.label}
                 className="w-full h-full object-contain"
               />

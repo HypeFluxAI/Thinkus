@@ -2,7 +2,7 @@ import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 import User from '../src/lib/db/models/user'
 import Project from '../src/lib/db/models/project'
-import dbConnect from '../src/lib/db/mongoose'
+import dbConnect from '../src/lib/db/connection'
 
 async function createTestUser() {
   try {
@@ -22,7 +22,7 @@ async function createTestUser() {
         name: 'E2E Test User',
         email: testEmail,
         password: hashedPassword,
-        emailVerified: new Date(),
+        emailVerified: true,
         role: 'user',
         status: 'active',
         subscription: {

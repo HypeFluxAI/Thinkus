@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, use } from 'react'
+import { useState, use, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -27,6 +27,9 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
 import type { IProject } from '@/lib/db/models/project'
+import { FriendlyError } from '@/components/ui/friendly-error'
+import { SimpleStatusPanel } from '@/components/project'
+import type { ProjectStatusInput } from '@/lib/services/status-aggregator'
 
 interface DeliveryFile {
   name: string
@@ -48,6 +51,7 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
   const { id: projectId } = use(params)
   const router = useRouter()
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [statusInput, setStatusInput] = useState<ProjectStatusInput | undefined>(undefined)
 
   // Fetch project data
   const { data: projectData, isLoading, error } = trpc.project.getById.useQuery({ id: projectId })
@@ -67,6 +71,25 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
     // In real implementation, this would trigger a file download
   }
 
+  // Fetch project status for SimpleStatusPanel
+  useEffect(() => {
+    async function fetchStatus() {
+      if (!project) return
+
+      try {
+        const res = await fetch(`/api/projects/${projectId}/status`)
+        if (res.ok) {
+          const data = await res.json()
+          setStatusInput(data.statusInput)
+        }
+      } catch (error) {
+        console.error('Failed to fetch project status:', error)
+      }
+    }
+
+    fetchStatus()
+  }, [projectId, project])
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -77,14 +100,16 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
 
   if (error || !project) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
-        <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">项目不存在</h2>
-        <p className="text-muted-foreground mb-4">该项目可能已被删除或您没有访问权限</p>
-        <Button onClick={() => router.push('/projects')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          返回项目列表
-        </Button>
+      <div className="min-h-screen bg-background flex items-center justify-center p-8">
+        <FriendlyError
+          error={error || new Error('项目不存在或您没有访问权限')}
+          onRetry={() => router.refresh()}
+          onContactSupport={() => {
+            window.open('mailto:support@thinkus.app?subject=项目访问问题', '_blank')
+          }}
+          showSupport={true}
+          size="lg"
+        />
       </div>
     )
   }
@@ -151,6 +176,37 @@ export default function CompletePage({ params }: { params: Promise<{ id: string 
             </div>
           </CardContent>
         </Card>
+
+        {/* Project Status Panel */}
+        {statusInput && (
+          <SimpleStatusPanel
+            projectId={projectId}
+            statusInput={statusInput}
+            autoRefresh={true}
+            refreshInterval={60}
+            size="sm"
+            showIssues={true}
+            onRefresh={async () => {
+              try {
+                const res = await fetch(`/api/projects/${projectId}/status`)
+                if (res.ok) {
+                  const data = await res.json()
+                  return data.statusInput
+                }
+              } catch (error) {
+                console.error('Failed to refresh status:', error)
+              }
+              return undefined
+            }}
+            onContactSupport={() => {
+              window.open('mailto:support@thinkus.app?subject=项目问题: ' + project.name, '_blank')
+            }}
+            onViewDetails={() => {
+              router.push(`/projects/${projectId}/status`)
+            }}
+            className="mb-6"
+          />
+        )}
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Quick Links */}

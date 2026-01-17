@@ -249,6 +249,7 @@ export class DocumentProcessorService {
   private async extractPDF(buffer: Buffer): Promise<string> {
     try {
       // 动态导入 pdf-parse
+      // @ts-ignore - pdf-parse doesn't have type declarations
       const pdfParse = (await import('pdf-parse')).default
       const data = await pdfParse(buffer)
       return data.text
@@ -311,6 +312,7 @@ export class DocumentProcessorService {
   private async extractExcel(buffer: Buffer, type: 'excel' | 'csv'): Promise<string> {
     try {
       // 动态导入 xlsx
+      // @ts-ignore - xlsx doesn't have type declarations
       const XLSX = await import('xlsx')
       const workbook = XLSX.read(buffer, { type: 'buffer' })
 
@@ -342,6 +344,7 @@ export class DocumentProcessorService {
   private async extractWord(buffer: Buffer): Promise<string> {
     try {
       // 动态导入 mammoth
+      // @ts-ignore - mammoth doesn't have type declarations
       const mammoth = await import('mammoth')
       const result = await mammoth.extractRawText({ buffer })
       return result.value

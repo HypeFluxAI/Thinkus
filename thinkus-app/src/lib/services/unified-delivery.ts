@@ -307,9 +307,10 @@ export class UnifiedDeliveryService {
         await this.runStage(state, 'acceptance_test', async () => {
           const report = await acceptanceTester.runAcceptanceTest(
             state.config.projectId,
+            state.config.projectName,
             state.config.productType,
-            'https://example.com', // 实际应从配置获取
-            (scenario, progress) => {
+            {}, // 使用默认配置
+            (message, progress) => {
               const stage = state.stages.find(s => s.stage === 'acceptance_test')
               if (stage) stage.progress = progress
               notify()
@@ -352,18 +353,22 @@ export class UnifiedDeliveryService {
 
       // 4. 部署上线
       await this.runStage(state, 'deployment', async () => {
-        const deliveryConfig = {
-          skipTests: state.config.skipAcceptanceTest,
-          skipBackup: !state.config.enableBackup,
+        const deliveryConfig: import('./one-click-delivery').DeliveryConfig = {
+          projectId: state.config.projectId,
+          projectName: state.config.projectName,
+          productType: state.config.productType,
+          baseUrl: 'https://example.com', // 实际应从配置获取
+          adminEmail: state.config.clientEmail,
           customDomain: state.config.customDomain,
-          notifyChannels: state.config.notifyChannels
+          enableMonitoring: state.config.enableMonitoring ?? true,
+          enableBackup: state.config.enableBackup ?? true,
+          enableTutorial: true,
+          notifyOnComplete: true
         }
 
         const result = await oneClickDelivery.executeDelivery(
-          state.config.projectId,
-          state.config.projectName,
           deliveryConfig,
-          (stage, step, progress) => {
+          (step, progress) => {
             const flowStage = state.stages.find(s => s.stage === 'deployment')
             if (flowStage) flowStage.progress = progress
             notify()
@@ -379,33 +384,41 @@ export class UnifiedDeliveryService {
 
       // 5. 账号设置
       await this.runStage(state, 'account_setup', async () => {
-        const account = await userOnboarding.createAccount(
+        const result = await userOnboarding.createAccount(
           state.config.projectId,
-          state.config.clientEmail,
-          'admin',
-          'email',
-          state.config.clientPhone
+          {
+            email: state.config.clientEmail,
+            displayName: state.config.clientName,
+            type: 'admin',
+            phone: state.config.clientPhone,
+            sendWelcomeEmail: state.config.sendWelcomeEmail ?? true,
+            sendSms: false,
+            generateSecureLink: false
+          }
         )
 
         state.outputs.adminCredentials = {
-          email: account.email,
-          tempPassword: account.tempPassword
+          email: result.account.email,
+          tempPassword: result.credentials.tempPassword
         }
 
-        return account
+        return result
       }, notify)
 
       // 6. 通知用户
       await this.runStage(state, 'notification', async () => {
         if (state.config.sendWelcomeEmail && state.outputs.adminCredentials) {
-          const account = {
+          const account: import('./user-onboarding').UserAccount = {
             id: generateId(),
             projectId: state.config.projectId,
             email: state.outputs.adminCredentials.email,
             tempPassword: state.outputs.adminCredentials.tempPassword,
-            accountType: 'admin' as const,
+            type: 'admin',
+            status: 'pending',
+            displayName: state.config.clientName,
             createdAt: new Date(),
             mustChangePassword: true,
+            loginAttempts: 0,
             notificationSent: false
           }
 

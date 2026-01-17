@@ -162,7 +162,7 @@ export default function DeliveryPage() {
     markAllAsRead,
     deleteNotification
   } = useNotifications({
-    userId,
+    projectId,
     pollInterval: 30000,
     autoStart: true
   })
@@ -249,21 +249,12 @@ export default function DeliveryPage() {
   // 初始化
   useEffect(() => {
     const init = async () => {
-      // 如果没有进度会话，创建一个
+      // 获取交付状态
       if (!progressSession && !progressLoading) {
         try {
-          await fetch('/api/delivery/progress', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              projectId,
-              projectName: '我的项目',
-              action: 'create'
-            })
-          })
-          refreshProgress()
+          await refreshProgress()
         } catch (error) {
-          console.error('创建进度会话失败:', error)
+          console.error('获取交付状态失败:', error)
         }
       }
       setIsInitialized(true)

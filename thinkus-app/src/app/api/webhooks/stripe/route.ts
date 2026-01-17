@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import mongoose from 'mongoose'
 import { stripe } from '@/lib/stripe/config'
-import { Project, Subscription, Payment, Notification, WebhookEvent } from '@/lib/db/models'
+import { Project, Subscription, Payment, Notification, WebhookEvent, DeliverySession } from '@/lib/db/models'
 import type { SubscriptionPlan, NotificationType } from '@/lib/db/models'
 import dbConnect from '@/lib/db/connection'
 import Stripe from 'stripe'
+import { DeliveryOrchestratorService } from '@/lib/services/delivery-orchestrator'
 
 // 发送通知的辅助函数
 async function sendNotification(params: {
@@ -127,6 +128,45 @@ export async function POST(req: NextRequest) {
               relatedTo: { type: 'project', id: project._id },
               priority: 'high',
             })
+
+            // 自动启动交付流程
+            try {
+              const deliveryOrchestrator = new DeliveryOrchestratorService()
+
+              // 创建交付会话
+              const deliveryConfig = {
+                projectId: project._id.toString(),
+                projectName: project.name,
+                userId: project.userId.toString(),
+                productType: project.productType || 'web-app',
+                userEmail: session.customer_email || '',
+                userName: session.customer_details?.name || '用户',
+                // 从项目配置中获取部署设置
+                deployConfig: {
+                  platform: 'vercel' as const,
+                  framework: 'nextjs' as const,
+                  autoSSL: true,
+                },
+                // 启用所有交付功能
+                enableE2ETests: true,
+                enableAcceptance: true,
+                notifyChannels: ['email', 'in_app'] as ('email' | 'sms' | 'in_app' | 'wechat')[],
+              }
+
+              // 异步启动交付流程（不阻塞 webhook 响应）
+              deliveryOrchestrator.startDelivery(deliveryConfig, (progress) => {
+                console.log(`[Delivery] Project ${projectId}: ${progress.stage} - ${progress.message}`)
+              }).then((result) => {
+                console.log(`[Delivery] Project ${projectId} delivery completed:`, result.success ? 'SUCCESS' : 'FAILED')
+              }).catch((error) => {
+                console.error(`[Delivery] Project ${projectId} delivery error:`, error)
+              })
+
+              console.log(`[Delivery] Started delivery for project ${projectId}`)
+            } catch (deliveryError) {
+              // 交付启动失败不影响支付成功状态
+              console.error(`[Delivery] Failed to start delivery for project ${projectId}:`, deliveryError)
+            }
           }
 
           console.log(`Project ${projectId} marked as paid`)

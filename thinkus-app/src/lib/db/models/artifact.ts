@@ -46,6 +46,9 @@ export interface IArtifact extends Document {
   createdAt: Date
   updatedAt: Date
   expiresAt?: Date                     // 过期时间
+
+  // 实例方法
+  toCompact(): ArtifactCompact
 }
 
 /**

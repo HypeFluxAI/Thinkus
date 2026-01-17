@@ -22,10 +22,17 @@ services:
       - GRPC_PY_SERVICE_URL=py-service:50051
       - GRPC_ANALYTICS_URL=go-analytics:50052
       - GRPC_SANDBOX_URL=go-sandbox:50053
+      # AI 服务地址
+      - AI_GUIDE_URL=http://py-ai-guide:8001
+      - AI_SUPPORT_URL=http://py-ai-support:8002
+      - AI_CARE_URL=http://go-ai-care:8003
     depends_on:
       - py-service
       - go-analytics
       - go-sandbox
+      - py-ai-guide
+      - py-ai-support
+      - go-ai-care
       - redis
     restart: unless-stopped
     healthcheck:
@@ -115,9 +122,260 @@ services:
       timeout: 5s
       retries: 3
 
+  # ============================================
+  # AI 服务 (小白用户支持)
+  # ============================================
+
+  # AI 产品导游服务 (Python)
+  py-ai-guide:
+    build:
+      context: ./services/py-ai-guide
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PORT=8001
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI 智能客服服务 (Python)
+  py-ai-support:
+    build:
+      context: ./services/py-ai-support
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PORT=8002
+      - AI_GUIDE_URL=http://py-ai-guide:8001
+    depends_on:
+      - redis
+      - py-ai-guide
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI 主动关怀服务 (Go)
+  go-ai-care:
+    build:
+      context: ./services/go-ai-care
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - PORT=8003
+      - GIN_MODE=release
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # 交付运营服务
+  # ============================================
+
+  # 交付队列调度服务 (Go) - 高并发队列管理
+  go-delivery-queue:
+    build:
+      context: ./services/go-delivery-queue
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - PORT=8004
+      - GIN_MODE=release
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 数据迁移服务 (Python) - Pandas 数据处理
+  py-data-migrator:
+    build:
+      context: ./services/py-data-migrator
+      dockerfile: Dockerfile
+    ports:
+      - "9002:9002"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - PORT=9002
+    volumes:
+      - migration-data:/tmp/migrations
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 环境管理服务 (Go) - 多环境部署编排
+  go-env-manager:
+    build:
+      context: ./services/go-env-manager
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - PORT=8005
+      - GIN_MODE=release
+      - VERCEL_TOKEN=${VERCEL_TOKEN}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 测试数据生成服务 (Python) - Faker 中文数据
+  py-test-data:
+    build:
+      context: ./services/py-test-data
+      dockerfile: Dockerfile
+    ports:
+      - "9003:9003"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - PORT=9003
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # CI/CD 和发布控制服务
+  # ============================================
+
+  # CI/CD 流水线服务 (Go) - GitHub Actions 集成
+  go-cicd-pipeline:
+    build:
+      context: ./services/go-cicd-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - PORT=8006
+      - GIN_MODE=release
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 冒烟测试服务 (Python) - 部署后自动验证
+  py-smoke-test:
+    build:
+      context: ./services/py-smoke-test
+      dockerfile: Dockerfile
+    ports:
+      - "9004:9004"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - PORT=9004
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 灰度发布控制器 (Go) - 渐进式发布
+  go-canary-release:
+    build:
+      context: ./services/go-canary-release
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - PORT=8007
+      - GIN_MODE=release
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 自动回滚服务 (Go) - 故障自动恢复
+  go-auto-rollback:
+    build:
+      context: ./services/go-auto-rollback
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - PORT=8008
+      - GIN_MODE=release
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   redis-data:
   sandbox-data:
+  migration-data:
 
 networks:
   default:

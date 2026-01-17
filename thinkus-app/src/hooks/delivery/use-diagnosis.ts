@@ -126,31 +126,32 @@ export function useDiagnosis({
       const performanceInfo = collectPerformanceInfo()
 
       // 调用后端诊断
-      const response = await fetch('/api/delivery/diagnosis', {
+      const response = await fetch(`/api/delivery/${projectId}/diagnosis`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'start',
-          projectId,
-          config: {
-            ...config,
-            projectUrl: window.location.origin,
-          }
+          clientData: {
+            browser: browserInfo,
+            network: networkInfo,
+            performance: performanceInfo,
+          },
+          config,
         })
       })
 
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.error)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '诊断失败')
       }
+
+      const data = await response.json()
 
       // 合并客户端信息
       const finalReport: DiagnosisReport = {
-        ...data.data,
-        browser: { ...data.data.browser, ...browserInfo },
-        network: { ...data.data.network, ...networkInfo },
-        performance: { ...data.data.performance, ...performanceInfo },
+        ...data.report,
+        browser: { ...data.report.browser, ...browserInfo },
+        network: { ...data.report.network, ...networkInfo },
+        performance: { ...data.report.performance, ...performanceInfo },
       }
 
       setReport(finalReport)

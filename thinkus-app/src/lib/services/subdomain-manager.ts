@@ -377,7 +377,7 @@ export class SubdomainManagerService {
   /**
    * 等待 SSL 证书配置完成
    */
-  private async waitForSSL(domain: string, maxAttempts = 12): Promise<SSLStatus> {
+  async waitForSSL(domain: string, maxAttempts = 12): Promise<SSLStatus> {
     for (let i = 0; i < maxAttempts; i++) {
       try {
         const params = new URLSearchParams()

@@ -17,10 +17,16 @@ services:
       - GRPC_PY_SERVICE_URL=py-service:50051
       - GRPC_ANALYTICS_URL=go-analytics:50052
       - GRPC_SANDBOX_URL=go-sandbox:50053
+      - AI_GUIDE_URL=http://py-ai-guide:8001
+      - AI_SUPPORT_URL=http://py-ai-support:8002
+      - AI_CARE_URL=http://go-ai-care:8003
     depends_on:
       - py-service
       - go-analytics
       - go-sandbox
+      - py-ai-guide
+      - py-ai-support
+      - go-ai-care
       - redis
     command: pnpm dev
 
@@ -95,6 +101,68 @@ services:
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
+
+  # ============================================
+  # AI 服务 (小白用户支持) - 开发模式
+  # ============================================
+
+  # AI 产品导游服务 (Python)
+  py-ai-guide:
+    build:
+      context: ./services/py-ai-guide
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./services/py-ai-guide/src:/app/src
+    environment:
+      - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PORT=8001
+      - DEBUG=true
+    depends_on:
+      - redis
+
+  # AI 智能客服服务 (Python)
+  py-ai-support:
+    build:
+      context: ./services/py-ai-support
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./services/py-ai-support/src:/app/src
+    environment:
+      - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PORT=8002
+      - DEBUG=true
+      - AI_GUIDE_URL=http://py-ai-guide:8001
+    depends_on:
+      - redis
+      - py-ai-guide
+
+  # AI 主动关怀服务 (Go)
+  go-ai-care:
+    build:
+      context: ./services/go-ai-care
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./services/go-ai-care:/app
+    environment:
+      - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
+      - MONGODB_DATABASE=thinkus
+      - REDIS_URL=redis://redis:6379
+      - PORT=8003
+      - GIN_MODE=debug
+    depends_on:
+      - redis
 
 volumes:
   redis-data:

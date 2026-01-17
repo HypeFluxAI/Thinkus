@@ -423,6 +423,22 @@ export class RealtimeStreamService {
   }
 
   /**
+   * 推送自定义事件
+   */
+  pushEvent(
+    projectId: string,
+    event: { type: string; data: Record<string, unknown> }
+  ): void {
+    this.push({
+      id: this.generateEventId(),
+      type: event.type as StreamEvent['type'],
+      projectId,
+      timestamp: Date.now(),
+      data: event.data,
+    } as StreamEvent)
+  }
+
+  /**
    * 推送通用事件
    */
   push(event: StreamEvent): void {
