@@ -220,7 +220,16 @@ thinkus/
 │   ├── hooks/                  # React hooks
 │   └── types/                  # 类型定义
 ├── prompts/                    # 提示词文件
-├── thinkus-docs/               # 项目文档
+├── services/                   # 微服务目录
+│   ├── py-service/             # Python核心微服务
+│   ├── py-ai-guide/            # AI引导服务
+│   ├── py-ai-support/          # AI支持服务
+│   ├── go-analytics/           # Go分析服务
+│   └── ...                     # 其他微服务
+├── thinkus-v12-docs/           # 项目文档
+│   ├── templates/              # 需求模板
+│   ├── core/                   # 核心架构
+│   └── ...                     # 其他文档
 └── CLAUDE.md                   # 本文件
 ```
 
@@ -272,20 +281,20 @@ thinkus/
 
 ```yaml
 核心文档:
-  - thinkus-docs/INDEX.md          # 文档索引
-  - thinkus-docs/PRD.md            # 产品需求
-  - thinkus-docs/ARCHITECTURE.md   # 技术架构
-  - thinkus-docs/BOOTSTRAP.md      # 开发启动指南
+  - thinkus-v12-docs/00-INDEX.md         # 文档索引
+  - thinkus-v12-docs/16-ROADMAP.md       # 产品路线图
+  - thinkus-v12-docs/core/               # 核心架构文档
+  - thinkus-v12-docs/capabilities/       # 能力说明文档
 
-规格定义:
-  - thinkus-docs/specs/data-models.ts   # 数据模型
-  - thinkus-docs/specs/api-specs.yaml   # API规格
+需求模板 (提需求时使用):
+  - thinkus-v12-docs/templates/feature-request.md        # 完整功能需求模板
+  - thinkus-v12-docs/templates/feature-request-simple.md # 简化需求模板
+  - thinkus-v12-docs/templates/bug-fix.md                # Bug修复模板
 
-页面规格:
-  - thinkus-docs/pages/*.yaml      # 各页面详情
-
-提示词:
-  - thinkus-docs/prompts/          # AI提示词库
+其他文档:
+  - thinkus-v12-docs/ai-employees/       # AI员工相关
+  - thinkus-v12-docs/optimization/       # 优化相关
+  - thinkus-v12-docs/testing/            # 测试相关
 ```
 
 ---
@@ -431,6 +440,7 @@ R2_REGION=auto
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-17 | 3.7.15 | 新增需求文档模板: feature-request.md(完整版)、feature-request-simple.md(简化版)、bug-fix.md(Bug修复)；更新文档目录引用为thinkus-v12-docs；完善目录结构说明 |
 | 2026-01-17 | 3.7.14 | 更新技术栈文档: 完善Python微服务列表，新增AI服务和运维工具描述 |
 | 2026-01-17 | 3.7.13 | 交付编排器关键优化: 六大优化提升交付可靠性和用户体验；**密码发送bug修复**修复delivery-orchestrator.ts第291行bug，配置阶段(configuring)存储原始密码到tempPassword字段，通知阶段(notifying)使用credentials.tempPassword发送邮件而非重新生成密码，邮件发送成功后删除tempPassword保留哈希值，更新delivery-session.ts的DeliveryOutputs接口和Schema添加tempPassword字段；**环境变量验证**新增REQUIRED_ENV_VARS配置(VERCEL_TOKEN必需/MONGODB_URI必需/SENDGRID_API_KEY建议)，validateEnvironment()方法检查必需环境变量，generateEnvErrorMessage()生成人话错误提示(配置方法/帮助链接)，startDelivery()开始前验证环境变量，缺失必需变量时返回详细错误信息；**预部署检查**testing阶段从空实现改为runPreDeploymentChecks()，检查6项内容(源目录存在/package.json存在/build脚本/env.example/.env安全/Next.js配置)，每项包含passed/message/messageZh/isBlocker，hasBlockers为true时阻止部署，检查结果保存到session.outputs.testReport；**质量门禁检查**verifying阶段E2E测试后添加runQualityGateCheck()，QUALITY_GATES配置(minPassRate:80%/warningPassRate:90%/maxCriticalFailures:2)，计算passRate和criticalFailures，返回passed/severity(none/warning/critical)/message/messageZh，门禁失败时记录警告事件；**验收邮件触发**acceptance阶段添加sendAcceptanceReminder()调用，发送验收提醒邮件(projectName/productUrl/acceptanceUrl/remainingHours)，记录24小时后发送超时警告邮件的计划事件；**部署重试策略**deploying阶段添加重试机制(MAX_RETRIES:3/BASE_DELAY_MS:5000)，指数退避延迟(5s/10s/20s)，每次尝试记录事件(attempt/maxRetries/willRetry)，translateDeploymentError()将技术错误翻译为人话(15种常见错误模式)，所有重试失败后抛出人话错误信息 |
 | 2026-01-17 | 3.7.12 | 交付系统真实API集成和数据持久化: 支付成功自动触发交付、SSE实时进度推送、完整交付API；**支付成功自动启动交付**更新api/webhooks/stripe/route.ts，checkout.session.completed事件处理时集成DeliveryOrchestratorService，支付成功后自动创建交付配置(deployConfig/enableE2ETests/enableAcceptance/notifyChannels)并异步启动交付流程，导入DeliverySession模型支持数据持久化；**SSE实时交付进度推送**新增api/delivery/[projectId]/stream/route.ts，基于ReadableStream的SSE实现，activeConnections管理活跃连接，broadcastDeliveryProgress()广播消息到所有订阅者，发送init初始状态/recent_events最近事件/stage_update阶段更新/complete完成事件，30秒心跳保持连接，2秒轮询数据库更新，支持自动重连；**交付状态API**新增api/delivery/[projectId]/route.ts，GET获取最新交付会话/最近50条事件/验收会话/交付报告，返回session/events/acceptance/report完整数据；**验收API**新增api/delivery/[projectId]/acceptance/route.ts，GET获取验收会话，POST开始验收(创建6项默认检查项/7天过期)，PATCH更新验收项目/添加问题报告，PUT完成验收(需签名确认/计算通过率/更新交付状态)；**一键诊断API**新增api/delivery/[projectId]/diagnosis/route.ts，POST运行诊断(收集clientData/检查产品URL/API健康/分析问题/计算健康分数)，GET快速健康状态检查，DIAGNOSIS_CATEGORIES配置5类诊断(browser/network/performance/api/storage)；**支持请求API**新增api/delivery/[projectId]/support/route.ts，POST提交支持请求(7种问题类型/优先级/预期响应时间)，GET获取支持信息/FAQ，ISSUE_TYPES配置问题类型含label/icon/priority/responseTime；**通知API**新增api/delivery/[projectId]/notifications/route.ts，GET获取交付相关通知(支持分页/仅未读)，POST标记已读/全部已读，DELETE删除通知；**Hooks更新**更新hooks/delivery/use-delivery-stream.ts使用新API端点/api/delivery/${projectId}/stream，更新事件处理(init/stage_update/event/complete)，更新hooks/delivery/use-delivery-progress.ts使用/api/delivery/${projectId}，更新hooks/delivery/use-diagnosis.ts使用/api/delivery/${projectId}/diagnosis，更新hooks/delivery/use-notifications.ts参数从userId改为projectId使用新API；**交付页面集成**更新app/(main)/projects/[id]/delivery/page.tsx，useNotifications使用projectId参数，init函数调用refreshProgress()获取真实数据 |
