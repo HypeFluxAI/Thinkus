@@ -440,6 +440,7 @@ R2_REGION=auto
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-17 | 3.9.0 | 拆分v13功能规格为13个独立模块文档(thinkus-v12-docs/v13-specs/): 00-overview概览、01-architecture三层架构、02-ai-executives高管系统、03-memory-system记忆系统、04-development-workflow开发流程、05-interface-contract接口契约、06-testing-system测试系统、07-model-routing模型调度、08-knowledge-system知识系统、09-ceo-dashboard控制台、10-data-models数据模型、11-api-design API设计、12-deployment部署运维；便于按模块开发和维护 |
 | 2026-01-17 | 3.8.0 | 创建v13完整功能需求规格文档(thinkus-v13-feature-spec.md): 整合v11/v12/v13所有历史文档; 包含18位AI高管团队定义、三层技术架构(Go+Python+Node.js)、8阶段开发流程、接口契约机制、Browser Use UI验收、多模型智能调度策略、全平台测试系统、知识积累与技能蒸馏机制、CEO Dashboard、商业模式与定价策略等完整功能规格 |
 | 2026-01-17 | 3.7.15 | 新增需求文档模板: feature-request.md(完整版)、feature-request-simple.md(简化版)、bug-fix.md(Bug修复)；更新文档目录引用为thinkus-v12-docs；完善目录结构说明 |
 | 2026-01-17 | 3.7.14 | 更新技术栈文档: 完善Python微服务列表，新增AI服务和运维工具描述 |
