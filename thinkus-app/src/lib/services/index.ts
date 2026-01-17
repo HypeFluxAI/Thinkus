@@ -1280,3 +1280,34 @@ export {
   type DeliveryProgressCallback as OrchestratorProgressCallback,
   type DeliveryResult,
 } from './delivery-orchestrator'
+
+// 版本追踪服务 (v12 新增)
+export {
+  versionTracker,
+  VersionTracker,
+  type Version,
+  type FileChange,
+  type VersionMetadata,
+  type VersionDiff,
+  type RollbackResult,
+  type VersionSearchOptions,
+  type VersionTreeNode,
+  type ChangeType,
+  type EntityType,
+} from './version-tracking'
+
+// 计划先行服务 (v12 新增)
+export {
+  planFirstService,
+  PlanFirstService,
+  type DevelopmentPlan,
+  type PlanStep,
+  type PlanSubStep,
+  type PlanContext,
+  type PlanGenerationResult,
+  type PlanExecutionProgress,
+  type PlanModification,
+  type PlanStepStatus,
+  type PlanApprovalStatus,
+  type PlanAlternative,
+} from './plan-first'

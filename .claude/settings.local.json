@@ -42,7 +42,9 @@
       "Bash(npx playwright install chromium)",
       "Bash(PLAYWRIGHT_BASE_URL=http://localhost:3002 npx playwright test:*)",
       "Bash(npx playwright test:*)",
-      "Bash(npm run test:e2e:*)"
+      "Bash(npm run test:e2e:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(tree:*)"
     ]
   }
 }

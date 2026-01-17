@@ -30,10 +30,22 @@
     - Memory/Executive服务
 
   Python微服务 (FastAPI + gRPC):
-    - DocumentProcessor (文档处理)
-    - RequirementIntegrator (需求整合)
-    - GrowthAdvisor (增长建议)
-    - ExperienceService (经验库)
+    核心服务 (services/py-service/):
+      - DocumentProcessor (文档处理 - PDF/图片/Excel/Word)
+      - RequirementIntegrator (需求整合和去重)
+      - GrowthAdvisor (AI增长建议)
+      - ExperienceService (经验库)
+
+    AI服务:
+      - py-ai-guide (AI引导服务)
+      - py-ai-support (AI支持服务)
+
+    运维工具:
+      - py-data-migrator (数据迁移工具)
+      - py-smoke-test (冒烟测试)
+      - py-test-data (测试数据生成)
+      - py-auto-diagnose (自动诊断)
+      - py-root-cause (根因分析)
 
   Go Analytics微服务 (Gin + gRPC):
     - AnalyticsService (数据分析)
@@ -419,6 +431,7 @@ R2_REGION=auto
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-01-17 | 3.7.14 | 更新技术栈文档: 完善Python微服务列表，新增AI服务和运维工具描述 |
 | 2026-01-17 | 3.7.13 | 交付编排器关键优化: 六大优化提升交付可靠性和用户体验；**密码发送bug修复**修复delivery-orchestrator.ts第291行bug，配置阶段(configuring)存储原始密码到tempPassword字段，通知阶段(notifying)使用credentials.tempPassword发送邮件而非重新生成密码，邮件发送成功后删除tempPassword保留哈希值，更新delivery-session.ts的DeliveryOutputs接口和Schema添加tempPassword字段；**环境变量验证**新增REQUIRED_ENV_VARS配置(VERCEL_TOKEN必需/MONGODB_URI必需/SENDGRID_API_KEY建议)，validateEnvironment()方法检查必需环境变量，generateEnvErrorMessage()生成人话错误提示(配置方法/帮助链接)，startDelivery()开始前验证环境变量，缺失必需变量时返回详细错误信息；**预部署检查**testing阶段从空实现改为runPreDeploymentChecks()，检查6项内容(源目录存在/package.json存在/build脚本/env.example/.env安全/Next.js配置)，每项包含passed/message/messageZh/isBlocker，hasBlockers为true时阻止部署，检查结果保存到session.outputs.testReport；**质量门禁检查**verifying阶段E2E测试后添加runQualityGateCheck()，QUALITY_GATES配置(minPassRate:80%/warningPassRate:90%/maxCriticalFailures:2)，计算passRate和criticalFailures，返回passed/severity(none/warning/critical)/message/messageZh，门禁失败时记录警告事件；**验收邮件触发**acceptance阶段添加sendAcceptanceReminder()调用，发送验收提醒邮件(projectName/productUrl/acceptanceUrl/remainingHours)，记录24小时后发送超时警告邮件的计划事件；**部署重试策略**deploying阶段添加重试机制(MAX_RETRIES:3/BASE_DELAY_MS:5000)，指数退避延迟(5s/10s/20s)，每次尝试记录事件(attempt/maxRetries/willRetry)，translateDeploymentError()将技术错误翻译为人话(15种常见错误模式)，所有重试失败后抛出人话错误信息 |
 | 2026-01-17 | 3.7.12 | 交付系统真实API集成和数据持久化: 支付成功自动触发交付、SSE实时进度推送、完整交付API；**支付成功自动启动交付**更新api/webhooks/stripe/route.ts，checkout.session.completed事件处理时集成DeliveryOrchestratorService，支付成功后自动创建交付配置(deployConfig/enableE2ETests/enableAcceptance/notifyChannels)并异步启动交付流程，导入DeliverySession模型支持数据持久化；**SSE实时交付进度推送**新增api/delivery/[projectId]/stream/route.ts，基于ReadableStream的SSE实现，activeConnections管理活跃连接，broadcastDeliveryProgress()广播消息到所有订阅者，发送init初始状态/recent_events最近事件/stage_update阶段更新/complete完成事件，30秒心跳保持连接，2秒轮询数据库更新，支持自动重连；**交付状态API**新增api/delivery/[projectId]/route.ts，GET获取最新交付会话/最近50条事件/验收会话/交付报告，返回session/events/acceptance/report完整数据；**验收API**新增api/delivery/[projectId]/acceptance/route.ts，GET获取验收会话，POST开始验收(创建6项默认检查项/7天过期)，PATCH更新验收项目/添加问题报告，PUT完成验收(需签名确认/计算通过率/更新交付状态)；**一键诊断API**新增api/delivery/[projectId]/diagnosis/route.ts，POST运行诊断(收集clientData/检查产品URL/API健康/分析问题/计算健康分数)，GET快速健康状态检查，DIAGNOSIS_CATEGORIES配置5类诊断(browser/network/performance/api/storage)；**支持请求API**新增api/delivery/[projectId]/support/route.ts，POST提交支持请求(7种问题类型/优先级/预期响应时间)，GET获取支持信息/FAQ，ISSUE_TYPES配置问题类型含label/icon/priority/responseTime；**通知API**新增api/delivery/[projectId]/notifications/route.ts，GET获取交付相关通知(支持分页/仅未读)，POST标记已读/全部已读，DELETE删除通知；**Hooks更新**更新hooks/delivery/use-delivery-stream.ts使用新API端点/api/delivery/${projectId}/stream，更新事件处理(init/stage_update/event/complete)，更新hooks/delivery/use-delivery-progress.ts使用/api/delivery/${projectId}，更新hooks/delivery/use-diagnosis.ts使用/api/delivery/${projectId}/diagnosis，更新hooks/delivery/use-notifications.ts参数从userId改为projectId使用新API；**交付页面集成**更新app/(main)/projects/[id]/delivery/page.tsx，useNotifications使用projectId参数，init函数调用refreshProgress()获取真实数据 |
 | 2026-01-17 | 3.7.11 | 交付系统集成完善和快捷操作组件: 项目详情页集成交付概览、交付页面错误边界包装、新增交付快捷操作组件；**项目详情页交付集成**更新app/(main)/projects/[id]/page.tsx，为paid/in_progress状态项目显示DeliveryOverview组件(进度条/当前阶段/预计时间/快捷操作按钮)，新增"交付中心"快捷入口到Quick Actions区域(高亮显示/DeliveryStatusBadge进度徽章/点击跳转交付页)，集成useDeliveryProgress和useDeliveryStream hooks获取实时进度和SSE连接状态，配置onViewProgress/onViewAcceptance/onViewNotifications/onContactSupport回调跳转对应页面；**交付页面错误边界**更新app/(main)/projects/[id]/delivery/page.tsx，导入DeliveryErrorBoundary和DeliveryLoadingSkeleton组件，页面内容外层包装DeliveryErrorBoundary(onError记录错误日志/onReset刷新数据)，初始化加载时显示DeliveryLoadingSkeleton骨架屏(type=progress)，错误时自动显示友好错误界面(重试/刷新按钮)；**交付快捷操作组件**新增components/delivery/delivery-quick-actions.tsx，QuickActionType支持8种操作类型(view_progress/start_acceptance/first_login/run_diagnosis/contact_support/view_notifications/download_report/view_credentials)，QUICK_ACTIONS配置每种操作的id/label/icon/description/color/bgColor/borderColor/available函数/priority优先级，QuickActionContext上下文含progressSession/acceptanceSession/hasUnreadNotifications/isDelivered/hasErrors，available()函数根据上下文判断操作是否可用(如start_acceptance仅交付完成且无验收会话时可用)；**DeliveryQuickActions**主组件显示最多4个相关快捷操作按钮(网格布局/悬停高亮/未读通知徽章)；**DeliveryQuickActionsBar**紧凑型水平操作条(用于页面顶部/底部/可滚动)；**FloatingQuickActions**悬浮快捷操作按钮(固定页面角落/展开显示操作列表/支持4种位置bottom-left/bottom-right/top-left/top-right/动画展开)；**DeliveryQuickActionsPanel**完整操作面板(显示所有操作/区分当前可用和交付后可用/不可用操作灰显)；**组件导出更新**更新components/delivery/index.ts导出4个新组件(DeliveryQuickActions/DeliveryQuickActionsBar/DeliveryQuickActionsPanel/FloatingQuickActions) |
