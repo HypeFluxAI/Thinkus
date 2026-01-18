@@ -28,6 +28,14 @@ from .maintenance import (
     MaintenanceService, MaintenanceSchedule, MaintenanceResult, MaintenanceTaskType,
     get_maintenance_service, start_maintenance_service, stop_maintenance_service
 )
+from .metrics import (
+    MemoryMetrics, get_metrics, track_operation, track_save,
+    track_retrieval, track_correction
+)
+from .scheduler import (
+    MemoryMaintenanceScheduler, get_scheduler, start_scheduler, stop_scheduler
+)
+from .compressor import MemoryCompressor, MemoryCluster, get_compressor
 
 __all__ = [
     # Main manager
@@ -90,4 +98,23 @@ __all__ = [
     "get_maintenance_service",
     "start_maintenance_service",
     "stop_maintenance_service",
+
+    # Metrics
+    "MemoryMetrics",
+    "get_metrics",
+    "track_operation",
+    "track_save",
+    "track_retrieval",
+    "track_correction",
+
+    # Scheduler
+    "MemoryMaintenanceScheduler",
+    "get_scheduler",
+    "start_scheduler",
+    "stop_scheduler",
+
+    # Compressor
+    "MemoryCompressor",
+    "MemoryCluster",
+    "get_compressor",
 ]

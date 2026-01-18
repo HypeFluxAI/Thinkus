@@ -14,10 +14,14 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(env_path)
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+from datetime import datetime
+import csv
+import io
 
 # Configure logging
 logging.basicConfig(
@@ -37,6 +41,11 @@ except ImportError:
 # Import employees
 from src.employees import get_employee, list_employees, EmployeeRegistry
 from src.employees.base import ChatContext
+
+# Import memory system
+from src.memory.manager import MemoryManager
+from src.memory.metrics import get_metrics
+from src.memory.models import MemoryTier
 
 
 # Pydantic models for HTTP API
@@ -77,6 +86,57 @@ class DiscussionRequest(BaseModel):
     topic: str
     employee_ids: List[str]
     initial_message: str
+
+
+# Memory API models
+class MemoryResponse(BaseModel):
+    memory_id: str
+    content: str
+    summary: Optional[str] = None
+    type: str
+    tier: str
+    status: str
+    confidence: float
+    created_at: str
+    last_seen: str
+    access_count: int
+    keywords: List[str] = []
+    project_id: str
+
+
+class MemoryListResponse(BaseModel):
+    memories: List[MemoryResponse]
+    total: int
+    stats: Dict[str, Any]
+
+
+class MemoryStatsResponse(BaseModel):
+    total_count: int
+    by_tier: Dict[str, int]
+    by_type: Dict[str, int]
+    avg_confidence: float
+    employee_id: str
+    project_id: Optional[str] = None
+
+
+class MemorySearchRequest(BaseModel):
+    query: str
+    employee_id: str
+    project_id: str
+    tenant_id: str = "default"
+    filters: Optional[Dict[str, Any]] = None
+    limit: int = 20
+
+
+class MemorySearchResponse(BaseModel):
+    results: List[MemoryResponse]
+    total: int
+    query: str
+
+
+class BatchDeleteRequest(BaseModel):
+    before_date: Optional[str] = None
+    tier: Optional[str] = None
 
 
 # Lifespan context manager
@@ -268,6 +328,411 @@ async def api_start_discussion(request: DiscussionRequest):
         "status": "active",
         "messages": []
     }
+
+
+# ===================
+# Memory Manager Cache
+# ===================
+
+_memory_managers: Dict[str, MemoryManager] = {}
+
+
+def get_memory_manager(employee_id: str, tenant_id: str = "default") -> MemoryManager:
+    """Get or create a memory manager for an employee with optional tenant isolation"""
+    # Include tenant_id in cache key for multi-tenant support
+    cache_key = f"{tenant_id}:{employee_id}"
+    if cache_key not in _memory_managers:
+        _memory_managers[cache_key] = MemoryManager(employee_id, tenant_id)
+    return _memory_managers[cache_key]
+
+
+# ===================
+# Memory Management API
+# ===================
+
+# Get memories for an employee
+@app.get("/api/v1/memory/{employee_id}", response_model=MemoryListResponse)
+async def api_get_memories(
+    employee_id: str,
+    project_id: Optional[str] = Query(None),
+    tier: Optional[str] = Query(None),
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation"),
+    limit: int = Query(50, ge=1, le=200)
+):
+    """Get memories for an employee, optionally filtered by project and tier"""
+    try:
+        manager = get_memory_manager(employee_id, tenant_id)
+        memories_data = await manager.retrieve("", project_id, top_k=limit)
+
+        # Filter by tier if specified
+        if tier:
+            memories_data = [m for m in memories_data if m.get("tier") == tier]
+
+        # Get stats
+        stats = await manager.get_stats(project_id)
+
+        # Format memories
+        memories = []
+        for m in memories_data:
+            memories.append(MemoryResponse(
+                memory_id=m.get("id", ""),
+                content=m.get("content", ""),
+                summary=m.get("message", "")[:100] if m.get("message") else None,
+                type=m.get("type", "fact"),
+                tier=m.get("tier", "relevant"),
+                status="active",
+                confidence=m.get("score", 0.8),
+                created_at=m.get("timestamp", datetime.utcnow().isoformat()),
+                last_seen=m.get("timestamp", datetime.utcnow().isoformat()),
+                access_count=0,
+                keywords=[],
+                project_id=m.get("project_id", project_id or "")
+            ))
+
+        return MemoryListResponse(
+            memories=memories,
+            total=len(memories),
+            stats={
+                "by_tier": stats.get("tiers", {}),
+                "by_type": stats.get("types", {}),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting memories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Delete a specific memory
+@app.delete("/api/v1/memory/{employee_id}/{memory_id}")
+async def api_delete_memory(
+    employee_id: str,
+    memory_id: str,
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation")
+):
+    """Delete a specific memory"""
+    try:
+        manager = get_memory_manager(employee_id, tenant_id)
+
+        # For now, we can't directly delete by ID without Pinecone
+        # This would need to be implemented in the manager
+        if not manager.index:
+            raise HTTPException(status_code=503, detail="Memory storage not available")
+
+        manager.index.delete(ids=[memory_id], namespace=manager.namespace)
+
+        return {"status": "deleted", "memory_id": memory_id}
+
+    except Exception as e:
+        logger.error(f"Error deleting memory: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Batch delete memories
+@app.delete("/api/v1/memory/{employee_id}")
+async def api_batch_delete_memories(
+    employee_id: str,
+    project_id: Optional[str] = Query(None),
+    before_date: Optional[str] = Query(None),
+    tier: Optional[str] = Query(None),
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation")
+):
+    """Batch delete memories based on criteria"""
+    try:
+        manager = get_memory_manager(employee_id, tenant_id)
+
+        if project_id:
+            result = await manager.delete_project_memories(project_id)
+            return {"status": "deleted", "project_id": project_id}
+
+        # For other criteria, we would need to implement filter-based deletion
+        raise HTTPException(
+            status_code=400,
+            detail="Please specify project_id for batch deletion"
+        )
+
+    except Exception as e:
+        logger.error(f"Error batch deleting memories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Export memories
+@app.get("/api/v1/memory/{employee_id}/export")
+async def api_export_memories(
+    employee_id: str,
+    project_id: Optional[str] = Query(None),
+    format: str = Query("json", regex="^(json|csv)$"),
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation")
+):
+    """Export memories in JSON or CSV format"""
+    try:
+        manager = get_memory_manager(employee_id, tenant_id)
+        memories_data = await manager.retrieve("", project_id, top_k=200)
+
+        if format == "csv":
+            # Create CSV
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow([
+                "id", "content", "type", "tier", "confidence", "created_at", "project_id"
+            ])
+            for m in memories_data:
+                writer.writerow([
+                    m.get("id", ""),
+                    m.get("content", ""),
+                    m.get("type", ""),
+                    m.get("tier", ""),
+                    m.get("score", 0),
+                    m.get("timestamp", ""),
+                    m.get("project_id", "")
+                ])
+
+            return Response(
+                content=output.getvalue(),
+                media_type="text/csv",
+                headers={
+                    "Content-Disposition": f"attachment; filename=memories_{employee_id}.csv"
+                }
+            )
+        else:
+            # Return JSON
+            return {
+                "employee_id": employee_id,
+                "project_id": project_id,
+                "exported_at": datetime.utcnow().isoformat(),
+                "count": len(memories_data),
+                "memories": memories_data
+            }
+
+    except Exception as e:
+        logger.error(f"Error exporting memories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Get memory statistics
+@app.get("/api/v1/memory/{employee_id}/stats", response_model=MemoryStatsResponse)
+async def api_get_memory_stats(
+    employee_id: str,
+    project_id: Optional[str] = Query(None),
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation")
+):
+    """Get memory statistics for an employee"""
+    try:
+        manager = get_memory_manager(employee_id, tenant_id)
+        stats = await manager.get_stats(project_id)
+
+        # Calculate average confidence
+        memories = await manager.retrieve("", project_id, top_k=100)
+        avg_conf = 0.8
+        if memories:
+            confidences = [m.get("score", 0.8) for m in memories]
+            avg_conf = sum(confidences) / len(confidences) if confidences else 0.8
+
+        return MemoryStatsResponse(
+            total_count=stats.get("count", len(memories)),
+            by_tier=stats.get("tiers", {}),
+            by_type=stats.get("types", {}),
+            avg_confidence=avg_conf,
+            employee_id=employee_id,
+            project_id=project_id
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting memory stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Search memories
+@app.post("/api/v1/memory/search", response_model=MemorySearchResponse)
+async def api_search_memories(request: MemorySearchRequest):
+    """Search memories with query and filters"""
+    try:
+        manager = get_memory_manager(request.employee_id, request.tenant_id)
+        memories_data = await manager.retrieve(
+            request.query,
+            request.project_id,
+            top_k=request.limit
+        )
+
+        # Apply filters if provided
+        if request.filters:
+            if "tier" in request.filters:
+                allowed_tiers = request.filters["tier"]
+                if isinstance(allowed_tiers, list):
+                    memories_data = [
+                        m for m in memories_data
+                        if m.get("tier") in allowed_tiers
+                    ]
+
+            if "type" in request.filters:
+                allowed_types = request.filters["type"]
+                if isinstance(allowed_types, list):
+                    memories_data = [
+                        m for m in memories_data
+                        if m.get("type") in allowed_types
+                    ]
+
+        # Format results
+        results = []
+        for m in memories_data:
+            results.append(MemoryResponse(
+                memory_id=m.get("id", ""),
+                content=m.get("content", ""),
+                summary=m.get("message", "")[:100] if m.get("message") else None,
+                type=m.get("type", "fact"),
+                tier=m.get("tier", "relevant"),
+                status="active",
+                confidence=m.get("score", 0.8),
+                created_at=m.get("timestamp", datetime.utcnow().isoformat()),
+                last_seen=m.get("timestamp", datetime.utcnow().isoformat()),
+                access_count=0,
+                keywords=[],
+                project_id=m.get("project_id", request.project_id)
+            ))
+
+        return MemorySearchResponse(
+            results=results,
+            total=len(results),
+            query=request.query
+        )
+
+    except Exception as e:
+        logger.error(f"Error searching memories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Run maintenance
+@app.post("/api/v1/memory/{employee_id}/maintenance")
+async def api_run_maintenance(
+    employee_id: str,
+    project_id: Optional[str] = Query(None),
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation")
+):
+    """Run maintenance on memories (decay, merge, cleanup)"""
+    try:
+        manager = get_memory_manager(employee_id, tenant_id)
+        stats = await manager.run_maintenance(project_id)
+
+        return {
+            "status": "completed",
+            "employee_id": employee_id,
+            "project_id": project_id,
+            "stats": stats
+        }
+
+    except Exception as e:
+        logger.error(f"Error running maintenance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Update memory tier
+class TierUpdateRequest(BaseModel):
+    tier: str  # CORE, RELEVANT, or COLD
+
+
+@app.patch("/api/v1/memory/{employee_id}/{memory_id}/tier")
+async def api_update_memory_tier(
+    employee_id: str,
+    memory_id: str,
+    request: TierUpdateRequest,
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation")
+):
+    """Update the tier of a specific memory"""
+    try:
+        # Validate tier
+        valid_tiers = ["CORE", "RELEVANT", "COLD"]
+        if request.tier.upper() not in valid_tiers:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid tier. Must be one of: {valid_tiers}"
+            )
+
+        manager = get_memory_manager(employee_id, tenant_id)
+
+        if not manager.index:
+            raise HTTPException(status_code=503, detail="Memory storage not available")
+
+        # Fetch the existing memory
+        result = manager.index.fetch(ids=[memory_id], namespace=manager.namespace)
+
+        if not result.vectors or memory_id not in result.vectors:
+            raise HTTPException(status_code=404, detail=f"Memory {memory_id} not found")
+
+        vector = result.vectors[memory_id]
+        metadata = dict(vector.metadata) if vector.metadata else {}
+
+        # Update tier
+        metadata["tier"] = request.tier.upper()
+
+        # Upsert with updated metadata
+        manager.index.upsert(
+            vectors=[{
+                "id": memory_id,
+                "values": vector.values,
+                "metadata": metadata
+            }],
+            namespace=manager.namespace
+        )
+
+        return {
+            "status": "updated",
+            "memory_id": memory_id,
+            "new_tier": request.tier.upper()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating memory tier: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===================
+# Prometheus Metrics
+# ===================
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Expose Prometheus metrics"""
+    metrics = get_metrics()
+    return Response(
+        content=metrics.get_metrics(),
+        media_type=metrics.get_content_type()
+    )
+
+
+# ===================
+# Cache Management
+# ===================
+
+@app.get("/api/v1/memory/{employee_id}/cache/stats")
+async def api_get_cache_stats(
+    employee_id: str,
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation")
+):
+    """Get cache statistics for an employee"""
+    try:
+        manager = get_memory_manager(employee_id, tenant_id)
+        stats = await manager.cache.get_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/v1/memory/{employee_id}/cache")
+async def api_clear_cache(
+    employee_id: str,
+    tenant_id: str = Query("default", description="Tenant ID for multi-tenant isolation")
+):
+    """Clear cache for an employee"""
+    try:
+        manager = get_memory_manager(employee_id, tenant_id)
+        result = await manager.cache.clear_all()
+        return {"status": "cleared" if result else "failed", "employee_id": employee_id}
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Run the app

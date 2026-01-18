@@ -6,6 +6,7 @@ import { notificationRouter } from './notification'
 import { discussionRouter } from './discussion'
 import { deliveryRouter } from './delivery'
 import { aiEmployeeRouter } from './ai-employee'
+import { memoryRouter } from './memory'
 
 export const appRouter = router({
   project: projectRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   discussion: discussionRouter,
   delivery: deliveryRouter,
   aiEmployee: aiEmployeeRouter,
+  memory: memoryRouter,
 })
 
 export type AppRouter = typeof appRouter

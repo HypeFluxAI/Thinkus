@@ -88,7 +88,8 @@ class Memory:
     # Identity
     memory_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    # Ownership & Isolation
+    # Ownership & Isolation (Multi-tenant)
+    tenant_id: str = ""         # Tenant ID for multi-tenant isolation
     owner_id: str = ""          # User ID
     employee_id: str = ""       # AI Employee ID
     project_id: str = ""        # Project ID
@@ -214,6 +215,7 @@ class Memory:
         """Convert to dictionary for storage"""
         return {
             "memory_id": self.memory_id,
+            "tenant_id": self.tenant_id,
             "owner_id": self.owner_id,
             "employee_id": self.employee_id,
             "project_id": self.project_id,
@@ -246,6 +248,7 @@ class Memory:
         """Convert to Pinecone-compatible metadata (limited to basic types)"""
         return {
             "memory_id": self.memory_id,
+            "tenant_id": self.tenant_id,
             "owner_id": self.owner_id,
             "employee_id": self.employee_id,
             "project_id": self.project_id,
@@ -270,6 +273,7 @@ class Memory:
         """Create Memory from dictionary"""
         memory = cls(
             memory_id=data.get("memory_id", str(uuid.uuid4())),
+            tenant_id=data.get("tenant_id", ""),
             owner_id=data.get("owner_id", ""),
             employee_id=data.get("employee_id", ""),
             project_id=data.get("project_id", ""),
@@ -341,10 +345,12 @@ class MemoryCandidate:
         owner_id: str,
         employee_id: str,
         project_id: str,
-        embedding: Optional[List[float]] = None
+        embedding: Optional[List[float]] = None,
+        tenant_id: str = ""
     ) -> Memory:
         """Convert candidate to full Memory"""
         return Memory(
+            tenant_id=tenant_id,
             owner_id=owner_id,
             employee_id=employee_id,
             project_id=project_id,

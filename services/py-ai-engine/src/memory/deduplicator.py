@@ -198,18 +198,34 @@ class SemanticDeduplicator:
     ) -> Memory:
         """
         Select the better memory to keep between two duplicates
-        Criteria: confidence, recency, support count
+        Criteria: confidence (primary), support count, recency
         """
-        # Calculate scores
+        # Normalize support to 0-1 range (cap at 10 supports for max score)
+        max_support = max(memory1.support, memory2.support, 1)
+        norm_support1 = min(memory1.support / max(max_support, 10), 1.0)
+        norm_support2 = min(memory2.support / max(max_support, 10), 1.0)
+
+        # Calculate recency scores - only count if difference is > 1 second
+        # This avoids giving bonus to memories created in quick succession
+        time_diff = abs((memory1.created_at - memory2.created_at).total_seconds())
+        if time_diff <= 1.0:
+            # Timestamps too close - treat as equal, no recency bonus
+            recency1 = 0.0
+            recency2 = 0.0
+        else:
+            recency1 = 1.0 if memory1.created_at > memory2.created_at else 0.0
+            recency2 = 1.0 if memory2.created_at > memory1.created_at else 0.0
+
+        # Calculate scores with confidence as primary factor
         score1 = (
-            memory1.confidence * 0.4 +
-            memory1.support * 0.3 +
-            (1.0 if memory1.created_at > memory2.created_at else 0.0) * 0.3
+            memory1.confidence * 0.5 +
+            norm_support1 * 0.3 +
+            recency1 * 0.2
         )
         score2 = (
-            memory2.confidence * 0.4 +
-            memory2.support * 0.3 +
-            (1.0 if memory2.created_at > memory1.created_at else 0.0) * 0.3
+            memory2.confidence * 0.5 +
+            norm_support2 * 0.3 +
+            recency2 * 0.2
         )
 
         return memory1 if score1 >= score2 else memory2

@@ -414,13 +414,20 @@ Only include memories with clear evidence. Skip neutral ones."""
 
             # Also check for same-topic different-value conflicts
             # e.g., "database is X" vs "database is Y"
-            topic_patterns = [
-                (r"(?:use|using|chose|chosen)\s+(\w+)", r"(?:use|using|chose|chosen)\s+(\w+)"),
-                (r"(?:tech\s*stack|stack|framework)\s+(?:is|includes?)\s+(\w+)",
-                 r"(?:tech\s*stack|stack|framework)\s+(?:is|includes?)\s+(\w+)"),
+            # Only check when the topic context is the same (e.g., both mention "database" or "frontend")
+            topic_context_patterns = [
+                # Same context: both mention database
+                (r"(?:database|db)\s+(?:is|uses?)\s+(\w+)", r"(?:database|db)\s+(?:is|uses?)\s+(\w+)"),
+                # Same context: both mention frontend
+                (r"(?:frontend|front-end)\s+(?:is|uses?|framework)\s+(\w+)", r"(?:frontend|front-end)\s+(?:is|uses?|framework)\s+(\w+)"),
+                # Same context: both mention backend
+                (r"(?:backend|back-end)\s+(?:is|uses?|framework)\s+(\w+)", r"(?:backend|back-end)\s+(?:is|uses?|framework)\s+(\w+)"),
+                # Tech stack declarations
+                (r"(?:tech\s*stack|stack)\s+(?:is|includes?)\s+(\w+)",
+                 r"(?:tech\s*stack|stack)\s+(?:is|includes?)\s+(\w+)"),
             ]
 
-            for mem_pattern, new_pattern in topic_patterns:
+            for mem_pattern, new_pattern in topic_context_patterns:
                 mem_match = re.search(mem_pattern, mem_lower)
                 new_match = re.search(new_pattern, new_lower)
                 if mem_match and new_match:

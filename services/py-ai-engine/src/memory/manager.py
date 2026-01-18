@@ -56,12 +56,20 @@ class MemoryManager:
     """
     Unified Memory Manager for AI Employees
     Integrates all memory subsystems
+    Supports multi-tenant isolation via MULTI_TENANT_ENABLED env var
     """
 
-    def __init__(self, employee_id: str):
+    def __init__(self, employee_id: str, tenant_id: str = "default"):
         self.employee_id = employee_id
+        self.tenant_id = tenant_id
+        self.multi_tenant_enabled = os.getenv("MULTI_TENANT_ENABLED", "false").lower() == "true"
         self.index_name = os.getenv("PINECONE_INDEX_NAME", "thinkus-memory")
-        self.namespace = f"employee_{employee_id}"
+
+        # Build namespace with optional tenant isolation
+        if self.multi_tenant_enabled and tenant_id:
+            self.namespace = f"tenant_{tenant_id}_employee_{employee_id}"
+        else:
+            self.namespace = f"employee_{employee_id}"
 
         # Initialize Pinecone
         self.pc = None
@@ -97,8 +105,8 @@ class MemoryManager:
         self._session_memories: List[Memory] = []
         self._last_summary_at: Optional[datetime] = None
 
-        # Redis cache layer
-        self.cache = MemoryCache(employee_id)
+        # Redis cache layer with tenant isolation
+        self.cache = MemoryCache(employee_id, tenant_id if self.multi_tenant_enabled else None)
         self._cache_initialized = False
 
     async def _ensure_cache(self) -> bool:
@@ -607,3 +615,174 @@ class MemoryManager:
         except Exception as e:
             logger.error(f"Failed to get stats: {e}")
             return {"error": str(e)}
+
+    # ===================
+    # Batch Operations
+    # ===================
+
+    async def batch_save(
+        self,
+        candidates: List[MemoryCandidate],
+        project_id: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        batch_size: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Save multiple memory candidates in batches
+        Returns statistics about the operation
+        """
+        if not self.index or not candidates:
+            return {"saved": 0, "failed": 0, "skipped": 0}
+
+        saved = 0
+        failed = 0
+        skipped = 0
+
+        # Process in batches
+        for i in range(0, len(candidates), batch_size):
+            batch = candidates[i:i + batch_size]
+            vectors_to_upsert = []
+
+            for candidate in batch:
+                try:
+                    memory = candidate.to_memory(
+                        owner_id=metadata.get("user_id", "") if metadata else "",
+                        employee_id=self.employee_id,
+                        project_id=project_id,
+                    )
+
+                    # Generate embedding
+                    embedding = await self._get_embedding(memory.content)
+                    if not embedding:
+                        skipped += 1
+                        continue
+
+                    memory.embedding = embedding
+
+                    vectors_to_upsert.append({
+                        "id": memory.memory_id,
+                        "values": embedding,
+                        "metadata": memory.to_pinecone_metadata()
+                    })
+
+                except Exception as e:
+                    logger.error(f"Failed to process candidate: {e}")
+                    failed += 1
+
+            # Batch upsert to Pinecone
+            if vectors_to_upsert:
+                try:
+                    self.index.upsert(
+                        vectors=vectors_to_upsert,
+                        namespace=self.namespace
+                    )
+                    saved += len(vectors_to_upsert)
+                    logger.info(f"Batch upserted {len(vectors_to_upsert)} memories")
+                except Exception as e:
+                    logger.error(f"Batch upsert failed: {e}")
+                    failed += len(vectors_to_upsert)
+
+        return {"saved": saved, "failed": failed, "skipped": skipped}
+
+    async def batch_delete(self, memory_ids: List[str]) -> Dict[str, Any]:
+        """
+        Delete multiple memories by their IDs
+        """
+        if not self.index or not memory_ids:
+            return {"deleted": 0, "failed": 0}
+
+        deleted = 0
+        failed = 0
+
+        # Pinecone supports batch delete
+        try:
+            self.index.delete(
+                ids=memory_ids,
+                namespace=self.namespace
+            )
+            deleted = len(memory_ids)
+            logger.info(f"Batch deleted {deleted} memories")
+        except Exception as e:
+            logger.error(f"Batch delete failed: {e}")
+            failed = len(memory_ids)
+
+        # Invalidate cache
+        await self._ensure_cache()
+        await self.cache._invalidate_query_caches()
+
+        return {"deleted": deleted, "failed": failed}
+
+    async def batch_update_tier(
+        self,
+        memory_ids: List[str],
+        new_tier: MemoryTier
+    ) -> Dict[str, Any]:
+        """
+        Update the tier for multiple memories
+        """
+        if not self.index or not memory_ids:
+            return {"updated": 0, "failed": 0}
+
+        updated = 0
+        failed = 0
+
+        # Fetch existing memories
+        memories = await self.retriever.retrieve_by_ids(memory_ids)
+
+        vectors_to_upsert = []
+        for memory in memories:
+            try:
+                memory.tier = new_tier
+                if memory.embedding:
+                    vectors_to_upsert.append({
+                        "id": memory.memory_id,
+                        "values": memory.embedding,
+                        "metadata": memory.to_pinecone_metadata()
+                    })
+            except Exception as e:
+                logger.error(f"Failed to update memory {memory.memory_id}: {e}")
+                failed += 1
+
+        # Batch upsert
+        if vectors_to_upsert:
+            try:
+                self.index.upsert(
+                    vectors=vectors_to_upsert,
+                    namespace=self.namespace
+                )
+                updated = len(vectors_to_upsert)
+            except Exception as e:
+                logger.error(f"Batch tier update failed: {e}")
+                failed += len(vectors_to_upsert)
+
+        return {"updated": updated, "failed": failed}
+
+    async def batch_retrieve_parallel(
+        self,
+        queries: List[str],
+        project_id: Optional[str] = None,
+        top_k: int = 5
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Retrieve memories for multiple queries in parallel
+        """
+        import asyncio
+
+        async def retrieve_single(query: str) -> tuple:
+            results = await self.retrieve(query, project_id, top_k)
+            return query, results
+
+        # Run all retrievals in parallel
+        tasks = [retrieve_single(q) for q in queries]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Organize results
+        output = {}
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"Parallel retrieval failed: {result}")
+                continue
+            query, memories = result
+            output[query] = memories
+
+        return output

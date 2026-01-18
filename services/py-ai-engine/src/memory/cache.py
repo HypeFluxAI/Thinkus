@@ -35,11 +35,17 @@ class MemoryCache:
     """
     Redis-based cache for memory system
     Implements cache-aside pattern with automatic invalidation
+    Supports multi-tenant isolation
     """
 
-    def __init__(self, employee_id: str):
+    def __init__(self, employee_id: str, tenant_id: Optional[str] = None):
         self.employee_id = employee_id
-        self.prefix = f"{CACHE_PREFIX}{employee_id}:"
+        self.tenant_id = tenant_id
+        # Build prefix with optional tenant isolation
+        if tenant_id:
+            self.prefix = f"{CACHE_PREFIX}{tenant_id}:{employee_id}:"
+        else:
+            self.prefix = f"{CACHE_PREFIX}{employee_id}:"
         self._client: Optional[redis.Redis] = None
         self._connected = False
 
