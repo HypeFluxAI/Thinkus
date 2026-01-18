@@ -23,6 +23,7 @@ services:
       - GRPC_ANALYTICS_URL=go-analytics:50052
       - GRPC_SANDBOX_URL=go-sandbox:50053
       - GRPC_AI_ENGINE_URL=py-ai-engine:50054
+      - GRPC_ORCHESTRATOR_URL=go-orchestrator:50060
       # AI 服务地址
       - AI_GUIDE_URL=http://py-ai-guide:8001
       - AI_SUPPORT_URL=http://py-ai-support:8002
@@ -31,6 +32,7 @@ services:
       - py-service
       - go-analytics
       - go-sandbox
+      - go-orchestrator
       - py-ai-engine
       - py-ai-guide
       - py-ai-support
@@ -122,6 +124,36 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Go Orchestrator (三层架构核心调度中心)
+  # ============================================
+
+  # Go 编排层服务 - 任务调度、契约管理、工作流编排
+  go-orchestrator:
+    build:
+      context: ./services
+      dockerfile: go-orchestrator/Dockerfile
+    ports:
+      - "8100:8100"  # HTTP
+      - "50060:50060"  # gRPC
+    environment:
+      - PORT=8100
+      - GRPC_PORT=50060
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DB=thinkus
+      - REDIS_URL=redis://redis:6379
+      - AI_ENGINE_URL=py-ai-engine:50054
+      - ENV=production
+    depends_on:
+      - redis
+      - py-ai-engine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8100/health"]
+      interval: 30s
+      timeout: 10s
       retries: 3
 
   # ============================================
