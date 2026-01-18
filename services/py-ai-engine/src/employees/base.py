@@ -46,7 +46,7 @@ class ChatContext:
 class BaseEmployee(ABC):
     """Base class for all AI employees"""
 
-    _client: AsyncAnthropic | None = None
+    _client: Optional[AsyncAnthropic] = None
     _memory_managers: Dict[str, MemoryManager] = {}  # Cache memory managers by employee_id
 
     def __init__(self):
