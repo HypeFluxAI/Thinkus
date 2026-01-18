@@ -78,7 +78,7 @@ REDIS_URL=redis://localhost:6379
 
 | 版本 | 更新内容 |
 |------|----------|
-| 5.2.0 | 多租户隔离: tenant_id支持(Pinecone namespace/Redis cache key/API参数)、MULTI_TENANT_ENABLED配置 |
+| 5.3.0 | 记忆系统完善: 256单元测试、API/监控/前端/多租户、修复corrector和deduplicator评分逻辑 |
 | 5.1.0 | 前端记忆面板、tRPC路由、Prometheus、定时任务、压缩、单元测试 |
 | 5.0.0 | AI员工记忆系统完整实现 (Redis缓存/跨员工共享/语义去重/动态Tier/记忆链/后台维护) |
 | 4.0.0 | 文档重构，详细规格移至v13-specs/ |
